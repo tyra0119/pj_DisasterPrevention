@@ -23,6 +23,8 @@ const RELEVANT_HOURS = 12
 const RELEVANT_LEVEL = '4'
 /** 空港へ向かうのに見ておく移動時間。これを引いて間に合うかを判断する。 */
 const TRAVEL_BUFFER_MIN = 120
+/** 宿へ戻るのに見ておく移動時間。空港ほど遠くない。 */
+const RIDE_HOME_MIN = 60
 /** 取り直す間隔。数分で状況が変わる。プッシュは前提にしない。 */
 const REFRESH_MS = 60000
 /** 1 回の取得件数。API の上限。 */
@@ -252,7 +254,31 @@ function waitText(suspension, event, lang) {
   if (!suspension.waitMinutes) return ''
   const rem = remaining(suspension, event)
   if (rem && rem.over) return s.inspectionPassed
-  return s.expectWait(`${formatDuration(rem.min, lang)}–${formatDuration(rem.max, lang)}`)
+
+  const span = s.expectWait(`${formatDuration(rem.min, lang)}–${formatDuration(rem.max, lang)}`)
+  // 時刻も添える。「5時間35分」だけだと、その場で引き算をさせることになる。
+  // 過去の地震を見ているときは、いまから数えても意味がないので出さない。
+  if (isPastView()) return span
+  const from = jstTime(new Date(Date.now() + rem.min * 60000).toISOString(), lang)
+  const to = jstTime(new Date(Date.now() + rem.max * 60000).toISOString(), lang)
+  return `${span} · ${s.resumeBy(from, to)}`
+}
+
+/**
+ * いまから終電までの分。日本の鉄道はおおむね 5:00〜24:00。
+ * 深夜 0〜5 時はすでに終電のあとなので 0 を返す。
+ */
+function minutesUntilLastTrain() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Tokyo',
+  }).formatToParts(new Date())
+  const h = Number(parts.find((p) => p.type === 'hour').value)
+  const m = Number(parts.find((p) => p.type === 'minute').value)
+  if (h < 5) return 0
+  return 24 * 60 - (h * 60 + m)
 }
 
 const ADVICE_KEY = {
@@ -315,12 +341,12 @@ function places(lang) {
 function overall(lang) {
   const s = t(lang)
   if (!analysis.event) {
-    return { advice: 'normal', status: s.statusNormal, lead: s.leadNormal, wait: '', action: '' }
+    return { advice: 'normal', status: s.statusNormal, lead: s.leadNormal, wait: '', decisionLead: '', note: '' }
   }
 
   const known = places(lang).filter((p) => p.place)
   if (known.length === 0) {
-    return { advice: 'unset', status: '', lead: s.noPlaces, wait: '', action: '' }
+    return { advice: 'unset', status: '', lead: s.noPlaces, wait: '', decisionLead: '', note: '' }
   }
 
   let worst = null
@@ -334,6 +360,7 @@ function overall(lang) {
   }
 
   const advice = worst.advice
+  const decided = decision(lang, representative)
   return {
     advice,
     status: s[STATUS_KEY[advice]],
@@ -347,19 +374,44 @@ function overall(lang) {
       advice === 'normal' || advice === 'avoid-rail'
         ? ''
         : waitText(representative, analysis.event, lang),
-    action: whatNow(lang),
+    // decision の lead は「今夜戻れるか」。上の lead (なぜ止まっているか) とは別。
+    lead2: decided.lead,
+    note: decided.note,
   }
 }
 
-function whatNow(lang) {
+/**
+ * 決めるべきことは 1 つ。**待つか、今夜の寝場所を確保するか。**
+ *
+ * 大地震のあと、駅周辺の宿は数時間で埋まる。1 時間目に決めるか
+ * 4 時間目に決めるかで結果が変わる。だから、待ち時間そのものではなく
+ * 「今夜戻れるかどうか」に翻訳して出す。
+ *
+ * @returns {{lead: string, note: string}}
+ */
+function decision(lang, representative) {
   const s = t(lang)
-  if (!analysis.event) return ''
+  if (!analysis.event) return { lead: '', note: '' }
+
   const advices = places(lang)
     .filter((p) => p.place)
     .map((p) => situation(p.place, p.hint).worst.advice)
-  if (advices.includes('avoid-rail')) return s.actShelter
-  if (advices.includes('wait')) return s.actWait
-  return s.actMove
+
+  if (advices.includes('avoid-rail')) {
+    return { lead: s.notBackTonight, note: s.hotelsFill }
+  }
+  if (!advices.includes('wait')) return { lead: s.actMove, note: '' }
+
+  // 止まっている。再開の最も遅い見込みに、宿までの移動を足して終電と比べる。
+  const rem = remaining(representative, analysis.event)
+  const untilLast = minutesUntilLastTrain()
+  if (!rem || rem.over) return { lead: s.actWait, note: '' }
+
+  const backBy = rem.max + RIDE_HOME_MIN
+  if (untilLast > 0 && backBy < untilLast) {
+    return { lead: s.backTonight, note: s.actWait }
+  }
+  return { lead: s.notBackTonight, note: s.hotelsFill }
 }
 
 function verdictBlock(lang) {
@@ -373,7 +425,12 @@ function verdictBlock(lang) {
     <p class="v-status">${esc(v.status)}</p>
     <p class="v-lead">${esc(v.lead)}</p>
     ${v.wait ? `<p class="v-eta">${esc(v.wait)}</p>` : ''}
-    ${v.action ? `<p class="v-act">${esc(v.action)}</p>` : ''}
+    ${v.lead2 || v.note
+      ? `<div class="v-act">
+           ${v.lead2 ? `<strong>${esc(v.lead2)}</strong>` : ''}
+           ${v.note ? `<span>${esc(v.note)}</span>` : ''}
+         </div>`
+      : ''}
   </section>`
 }
 
