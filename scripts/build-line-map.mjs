@@ -18,7 +18,7 @@
 import { writeFile, mkdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { indexStationsByName, matchSystem } from './lib/match-lines.mjs'
+import { indexStationsByName, matchSystem, normalizeStationName } from './lib/match-lines.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = join(root, 'data')
@@ -218,6 +218,25 @@ async function main() {
     // 代わりに座標で足切りする (matchSystem 側)。
     const result = matchSystem({ title: rw['dc:title'], stations: stationsIn }, byName)
 
+    // 系統の駅座標。運転系統は N02 路線の一部しか走らないことがある
+    // (山手線は東北線の田端〜東京しか使わない)。徒歩点検の区間長を出すとき、
+    // 系統がどこを通っているかを知らないと路線全長を拾ってしまう。
+    //
+    // ODPT は 2 割の駅に座標を持たない (東海道新幹線・成田スカイアクセス線など
+    // 空港アクセスの系統が丸ごと欠ける)。当てた N02 の駅から埋める。
+    const chosen = new Set(result.lineIds)
+    const geo = []
+    for (const st of stationsIn) {
+      if (typeof st.lat === 'number' && typeof st.lon === 'number') {
+        geo.push([Number(st.lat.toFixed(4)), Number(st.lon.toFixed(4))])
+        continue
+      }
+      const fallback = (byName.get(normalizeStationName(st.name)) ?? []).find((c) =>
+        chosen.has(c.lineId),
+      )
+      if (fallback) geo.push([fallback.lat, fallback.lon])
+    }
+
     systems.push({
       id,
       title: rw['dc:title'] ?? rw['odpt:railwayTitle']?.ja ?? '',
@@ -229,6 +248,7 @@ async function main() {
       matched: result.matchedStations,
       total: result.totalStations,
       unmatched: result.unmatched,
+      geo,
     })
   }
 

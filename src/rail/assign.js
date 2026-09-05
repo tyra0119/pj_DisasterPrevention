@@ -5,7 +5,7 @@
 // ここまでが地震データ側からの推定で、実際に止まっているかは運行情報で確定させる。
 
 import { SHINDO_ORDER } from '../quake/types.js'
-import { sampleSegment } from '../quake/field.js'
+import { sampleAt } from '../quake/field.js'
 
 /** @typedef {import('../quake/types.js').ShindoLevel} ShindoLevel */
 /** @typedef {import('../quake/field.js').Confidence} Confidence */
@@ -19,21 +19,39 @@ import { sampleSegment } from '../quake/field.js'
  * @property {ShindoLevel|null} level  線内で観測された最大震度。
  * @property {Confidence} confidence
  * @property {SegmentPoint|null} at  最大震度を記録した地点。駅なら駅名が入る。
- * @property {{label: string, distanceKm: number}|null} source  その値を与えた観測点と距離。
+ * @property {{label:string, distanceKm:number}|null} source  その値を与えた観測点と距離。
  * @property {number} sampledPoints
  * @property {number} unknownPoints
+ * @property {TrackSample} trackSample
+ * @property {(ShindoLevel|null)[]} trackLevels
+ *   line.track と同じ並びの震度。運転系統が使う区間だけを数えるのに要る。
  */
 
 /**
- * 路線の判定に使う地点。駅を優先し、駅間の穴を線形で埋める。
- * @param {RailLine} line
- * @returns {SegmentPoint[]}
+ * 線形点だけを見た震度の分布。
+ *
+ * 徒歩点検の所要時間は点検区間の長さに比例するので、線内のどれだけが
+ * 強く揺れたかを知りたい。駅は都市部に密集していて路線に沿って一様ではないため、
+ * 長さの推定には約 2km 間隔で並ぶ線形点だけを使う。
+ *
+ * @typedef {object} TrackSample
+ * @property {number} total  線形点の数。
+ * @property {Record<string, number>} counts  震度階級ごとの点数。
  */
-function samplePoints(line) {
-  /** @type {SegmentPoint[]} */
-  const points = line.stations.map((s) => ({ lat: s.lat, lon: s.lon, label: s.name }))
-  for (const [lat, lon] of line.track) points.push({ lat, lon })
-  return points
+
+/**
+ * @param {TrackSample} sample
+ * @param {ShindoLevel} level
+ * @returns {number} その震度以上だった線形点の割合 (0〜1)。線形点が無ければ 0。
+ */
+export function trackFractionAtOrAbove(sample, level) {
+  if (sample.total === 0) return 0
+  const floor = SHINDO_ORDER[level]
+  let n = 0
+  for (const [key, count] of Object.entries(sample.counts)) {
+    if (SHINDO_ORDER[/** @type {ShindoLevel} */ (key)] >= floor) n += count
+  }
+  return n / sample.total
 }
 
 /**
@@ -53,18 +71,57 @@ export function assignToLines(field, lines, { radiusKm = 20, minLevel } = {}) {
 
   /** @type {LineImpact[]} */
   const impacts = []
+
   for (const line of lines) {
-    const seg = sampleSegment(field, samplePoints(line), radiusKm)
-    if (floor > 0 && (!seg.level || SHINDO_ORDER[seg.level] < floor)) continue
+    /** @type {{sample: import('../quake/field.js').Sample, point: SegmentPoint}|null} */
+    let best = null
+    let unknownPoints = 0
+    let sawBelowThreshold = false
+    /** @type {Record<string, number>} */
+    const trackCounts = {}
+    /** @type {(ShindoLevel|null)[]} */
+    const trackLevels = []
+
+    // 鉄道の運転見合わせは区間内の最大震度で決まるので、平均ではなく最大を取る。
+    const consider = (sample, point) => {
+      if (sample.confidence === 'unknown') unknownPoints++
+      if (sample.confidence === 'below-threshold') sawBelowThreshold = true
+      if (!sample.level) return
+      if (!best || SHINDO_ORDER[sample.level] > SHINDO_ORDER[best.sample.level]) {
+        best = { sample, point }
+      }
+    }
+
+    for (const st of line.stations) {
+      consider(sampleAt(field, st.lat, st.lon, radiusKm), {
+        lat: st.lat,
+        lon: st.lon,
+        label: st.name,
+      })
+    }
+    // 駅間が数十 km ある路線 (北海道・山陰) は駅だけだと穴が空くので線形も見る。
+    for (const [lat, lon] of line.track) {
+      const sample = sampleAt(field, lat, lon, radiusKm)
+      consider(sample, { lat, lon })
+      trackLevels.push(sample.level)
+      if (sample.level) trackCounts[sample.level] = (trackCounts[sample.level] ?? 0) + 1
+    }
+
+    const level = best?.sample.level ?? null
+    if (floor > 0 && (!level || SHINDO_ORDER[level] < floor)) continue
 
     impacts.push({
       line,
-      level: seg.level,
-      confidence: seg.confidence,
-      at: seg.at,
-      source: seg.source ? { label: seg.source.label, distanceKm: seg.source.distanceKm } : null,
-      sampledPoints: seg.totalPoints,
-      unknownPoints: seg.unknownPoints,
+      level,
+      confidence: best ? 'reported' : sawBelowThreshold ? 'below-threshold' : 'unknown',
+      at: best?.point ?? null,
+      source: best?.sample.source
+        ? { label: best.sample.source.label, distanceKm: best.sample.source.distanceKm }
+        : null,
+      sampledPoints: line.stations.length + line.track.length,
+      unknownPoints,
+      trackSample: { total: line.track.length, counts: trackCounts },
+      trackLevels,
     })
   }
 

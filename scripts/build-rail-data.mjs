@@ -28,6 +28,19 @@ const outDir = join(root, 'data')
 
 const round = (n) => Number(n.toFixed(4))
 
+// 徒歩点検の所要時間は点検区間長に比例する (高浜・翠川 2011)。
+// 路線長を持っておかないと待ち時間が出せないので、間引く前の頂点から測る。
+const EARTH_RADIUS_KM = 6371
+const toRad = (deg) => (deg * Math.PI) / 180
+function segmentKm(aLat, aLon, bLat, bLon) {
+  const dLat = toRad(bLat - aLat)
+  const dLon = toRad(bLon - aLon)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLon / 2) ** 2 * Math.cos(toRad(aLat)) * Math.cos(toRad(bLat))
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h))
+}
+
 /** 路線 ID。路線が増減しても他の ID がずれないよう、名前から決める。 */
 function lineId(operator, name) {
   let h = 0x811c9dc5
@@ -86,6 +99,7 @@ async function main() {
         operatorType: Number(props.N02_002) || 0,
         stations: new Map(),
         track: new Map(),
+        lengthKm: 0,
       }
       lines.set(key, line)
     }
@@ -115,7 +129,13 @@ async function main() {
   // 区間の頂点を約 2km 格子に間引いて足しておく。
   for (const f of sectionFeatures) {
     const line = lineOf(f.properties)
+    let prev = null
     for (const [lon, lat] of vertices(f.geometry)) {
+      // 路線長は間引く前の頂点で測る。区間が複数レコードに分かれていても、
+      // レコードごとに足し合わせれば全長になる。
+      if (prev) line.lengthKm += segmentKm(prev[0], prev[1], lat, lon)
+      prev = [lat, lon]
+
       const key = `${Math.round(lat / TRACK_CELL_DEG)}:${Math.round(lon / TRACK_CELL_DEG)}`
       if (!line.track.has(key)) line.track.set(key, [round(lat), round(lon)])
     }
@@ -137,6 +157,7 @@ async function main() {
         operator: line.operator,
         name: line.name,
         operatorType: line.operatorType,
+        lengthKm: Number(line.lengthKm.toFixed(1)),
         stations,
         track: [...line.track.values()],
       }
@@ -169,7 +190,11 @@ async function main() {
     }),
   )
 
-  console.log(`lines: ${out.length}  stations: ${totalStations}  track points: ${totalTrack}`)
+  const totalKm = out.reduce((n, l) => n + l.lengthKm, 0)
+  console.log(
+    `lines: ${out.length}  stations: ${totalStations}  track points: ${totalTrack}` +
+      `  total: ${Math.round(totalKm).toLocaleString()}km`,
+  )
   console.log(`out:   ${join(outDir, 'rail-lines.json')}`)
 }
 

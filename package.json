@@ -12,6 +12,7 @@
     "verify:shindo": "node scripts/verify-spatialize.mjs",
     "verify:rail": "node scripts/verify-rail.mjs",
     "verify:systems": "node scripts/verify-systems.mjs",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "verify:regulation": "node scripts/verify-regulation.mjs"
   }
 }
