@@ -6,11 +6,17 @@
 //
 // 地震情報 (P2P) はキャッシュしない。古い地震を新しい情報として見せる方が、
 // 「取れなかった」と言うより危ない。画面側が最終取得時刻を必ず出す。
+//
+// 取得はすべて cache: 'no-cache' で行う。GitHub Pages が max-age=600 を返すので、
+// 素の fetch はブラウザの HTTP キャッシュから古いものを受け取る。
+// Service Worker のキャッシュを消しても、その手前で古いものが返ってくる。
+// no-cache は「取得しない」ではなく「必ずサーバに確かめる」なので、
+// 変わっていなければ 304 で済む。
 
 // ビルド工程が無いのでファイル名に版が振れない。ここを上げることが唯一の
 // キャッシュ無効化手段になる。**コードを変えたら必ず上げること。**
 // 上げ忘れると、一度アクセスした利用者に古い画面が出続ける (v1 で実際に起きた)。
-const VERSION = 'v3'
+const VERSION = 'v4'
 const SHELL = `shell-${VERSION}`
 const DATA = `data-${VERSION}`
 
@@ -27,22 +33,28 @@ const DATA_FILES = [
   'data/scenarios.json',
 ]
 
+/** 取得は必ずサーバに確かめる。HTTP キャッシュの古い応答を掴まないため。 */
+const fetchFresh = (request) => fetch(request, { cache: 'no-cache' })
+
+/** 1 件ずつ入れる。addAll は cache オプションを取れず、1 つ失敗すると全滅する。 */
+async function fill(cache, files) {
+  await Promise.all(
+    files.map(async (file) => {
+      try {
+        const res = await fetchFresh(file)
+        if (res.ok) await cache.put(file, res)
+      } catch {
+        // 取れなければオンライン時に取り直す。
+      }
+    }),
+  )
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const shell = await caches.open(SHELL)
-      await shell.addAll(SHELL_FILES)
-      const data = await caches.open(DATA)
-      // データは 1 つ失敗しても残りを入れる (addAll は 1 つでも落ちると全滅する)。
-      await Promise.all(
-        DATA_FILES.map(async (f) => {
-          try {
-            await data.add(f)
-          } catch {
-            // 取れなければオンライン時に取り直す。
-          }
-        }),
-      )
+      await fill(await caches.open(SHELL), SHELL_FILES)
+      await fill(await caches.open(DATA), DATA_FILES)
       await self.skipWaiting()
     })(),
   )
@@ -93,7 +105,7 @@ async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
   const hit = await cache.match(request, { ignoreSearch: true })
   if (hit) return hit
-  const res = await fetch(request)
+  const res = await fetchFresh(request)
   if (res.ok) cache.put(request, res.clone())
   return res
 }
@@ -101,7 +113,7 @@ async function cacheFirst(request, cacheName) {
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
   try {
-    const res = await fetch(request)
+    const res = await fetchFresh(request)
     if (res.ok) cache.put(request, res.clone())
     return res
   } catch (err) {
