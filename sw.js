@@ -7,7 +7,10 @@
 // 地震情報 (P2P) はキャッシュしない。古い地震を新しい情報として見せる方が、
 // 「取れなかった」と言うより危ない。画面側が最終取得時刻を必ず出す。
 
-const VERSION = 'v1'
+// ビルド工程が無いのでファイル名に版が振れない。ここを上げることが唯一の
+// キャッシュ無効化手段になる。**コードを変えたら必ず上げること。**
+// 上げ忘れると、一度アクセスした利用者に古い画面が出続ける (v1 で実際に起きた)。
+const VERSION = 'v2'
 const SHELL = `shell-${VERSION}`
 const DATA = `data-${VERSION}`
 
@@ -52,6 +55,10 @@ self.addEventListener('activate', (event) => {
         if (!keep.has(key)) await caches.delete(key)
       }
       await self.clients.claim()
+      // 版が変わったことを開いている画面に伝える。画面側が 1 度だけ読み直す。
+      for (const client of await self.clients.matchAll({ type: 'window' })) {
+        client.postMessage({ type: 'sw-updated', version: VERSION })
+      }
     })(),
   )
 })

@@ -220,8 +220,19 @@
 
       // オフライン対応。地震のあとは回線が細るので、同梱データは端末に残す。
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(() => {
+        // updateViaCache: 'none' で sw.js 自体は必ず取りに行く。
+        // これが無いと、古い Service Worker が居座って新しい画面が届かない。
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {
           // 登録できなくてもオンラインなら動く。
+        })
+
+        // 新しい版が有効になったら 1 度だけ読み直す。
+        // 二重に読み直して無限ループにならないよう、印を付けてから遷移する。
+        navigator.serviceWorker.addEventListener('message', (ev) => {
+          if (ev.data?.type !== 'sw-updated') return
+          if (sessionStorage.getItem('sw-reloaded') === ev.data.version) return
+          sessionStorage.setItem('sw-reloaded', ev.data.version)
+          location.reload()
         })
       }
     </script>
