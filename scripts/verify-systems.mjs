@@ -22,9 +22,8 @@ const rail = await readJson('data/rail-lines.json')
 const lineMap = await readJson('data/line-map.json')
 
 const c = lineMap.coverage
-console.log(
-  `対応表: ${lineMap.count} 系統 (${lineMap.keyed ? 'トークンあり' : 'トークンなし — 公開分のみ'})`,
-)
+const srcs = (lineMap.sources ?? []).map((s) => s.endpoint.replace('https://', '')).join(' + ')
+console.log(`対応表: ${lineMap.count}/${lineMap.railwaysSeen} 系統  [${srcs}]`)
 console.log(`  全駅一致 ${c.full} / 一部 ${c.partial} / 不一致 ${c.none}`)
 console.log(`  駅の被覆 ${c.stationMatched}/${c.stationTotal} (${((c.stationMatched / c.stationTotal) * 100).toFixed(1)}%)`)
 

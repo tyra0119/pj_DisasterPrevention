@@ -1,11 +1,11 @@
-# 震度 → 路線への割り当て — 検証メモ
+# 震度 → 路線 → 運転系統 — 検証メモ
 
 訪日外国人向けの単体 Web アプリ。地震発生から 30 分〜数時間の
 「帰れるのか／飛べるのか」に答える。震度の数値ではなく、待つべきか動くべきかを出す。
 GitHub Pages でリポジトリ直下をそのまま配信する（遅延レーダーと同じ）ので、
 サーバもビルドも持たない。`src/` はプレーン JS で、型は JSDoc で持つ。
 
-震度分布 → 路線への割り当て、までを実データで通した。
+震度分布 → 路線への割り当て → 運転系統への合成、までを実データで通した。
 残るのは停止推定と ODPT 運行情報での確定。
 
 ## 結論
@@ -20,9 +20,13 @@ event: 茨城県南部 M5.9 最大震度5-  観測点 1299 点
 assigned 596 lines in 162ms
 揺れた路線: 278 { '1': 77, '2': 25, '3': 35, '4': 55, '5-': 86 }
 揺れなかった路線 (震度1未満): 318   判定不能: 0
+
+対応表: 190/215 系統  [api.odpt.org + api-challenge.odpt.org]
+  全駅一致 151 / 一部 13 / 不一致 26
+  駅の被覆 2092/2131 (98.2%)
 ```
 
-`npm run verify:shindo` / `npm run verify:rail` で再現できる。
+`npm run verify:shindo` / `verify:rail` / `verify:systems` で再現できる。
 
 ## データ源
 
@@ -32,6 +36,7 @@ assigned 596 lines in 162ms
 | 同 (気象庁一次) | `www.jma.go.jp/bosai/quake/data/list.json` | 不要 | `*` | — |
 | 観測点座標 | 気象庁「震度観測点一覧表」由来の公開ミラー | 不要 | — | — |
 | 駅・路線 | 国土数値情報 鉄道データ N02-25 | 不要 | — | CC BY 4.0 |
+| 運転系統 | ODPT `odpt:Railway` / `odpt:Station` | **要** | — | — |
 
 気象庁 bosai の JSON は、気象庁自身が自サイト用に出しているもので、
 XML と同じ内容が JSON 化済み・鍵なし・CORS 開放・`max-age=60`。
@@ -49,8 +54,13 @@ N02 は CC BY 4.0 なので、生成物を Pages に同梱して配れる。出�
 | `data/shindo-stations.json` | 観測点 4,360 点 | 775KB | 86KB |
 | `data/shindo-areas.json` | 細分区域 188 | 27KB | 6.6KB |
 | `data/rail-lines.json` | 596 路線 / 10,154 駅 / 17,189 線形点 | 1.05MB | 289KB |
+| `data/line-map.json` | 運転系統 190 → N02 路線の対応表 | 45KB | 7.1KB |
 
-合計 gzip 382KB。Service Worker で丸ごとプリキャッシュできる範囲。
+合計 gzip 388KB。Service Worker で丸ごとプリキャッシュできる範囲。
+
+**ODPT の鍵はビルド時にしか使わない。** 対応表は生成物として配るので、
+`data/line-map.json` にも Pages にも鍵は載らない (生成物を検査して確認済み)。
+`.env.local` は `.gitignore` 済み。
 
 ## 設計判断
 
@@ -72,6 +82,12 @@ N02 の区間頂点を約 2km 格子に間引いて足す。判定半径が 20km
 
 **格子索引。** 総当たりだと 27,343 地点 × 4,360 観測点で 1.2 億回。
 0.25 度セルの格子で候補を絞って 162ms に収めた。
+
+**運転系統の対応表は手書きしない。** ODPT の駅を N02 の駅に当てて導く。
+手で書くと N02 の改版で静かに腐るが、駅から導けば被覆率という形で壊れたと分かる。
+曖昧なとき (ODPT が 1 駅しか公開しておらず、その駅が複数路線に属する) は当てない。
+誤った路線を「揺れている」と言う方が、分からないと言うより悪い。
+経緯は `vault/運転系統の対応表.md`。
 
 ## 実行例 (2026-08-23 茨城県南部 M5.9 最大震度5弱)
 
@@ -103,7 +119,8 @@ ODPT の運行情報は運転系統単位で来る。**運転系統 1 本 ↔ N0
 
 ## 残っている宿題
 
-- **運転系統 ↔ N02 路線の対応表。** 上記のとおり次の山。ODPT と繋ぐ前に要る。
+- **停止推定のしきい値。** 各社の運転規制値 (一般に震度4〜5弱で規制、点検後再開) は
+  公開情報にばらつきがある。ここが決まらないと判断材料への翻訳ができない。次の山。
 - **半径は問いによって変える。** 路線は 20km でよいが、「今いる場所」を同じ半径で答えると
   12km 先の観測点の値を返してしまい悲観的すぎる。滞在地は 5km 前後で分ける。
 - **ODPT の鍵。** Pages は静的配信なので鍵が露出する。運行情報だけ薄いプロキシ
@@ -111,8 +128,8 @@ ODPT の運行情報は運転系統単位で来る。**運転系統 1 本 ↔ N0
   駅・路線のジオメトリは N02 で足りているので、ODPT は運行情報と航空便に絞れる。
 - **観測点マスタはミラー経由。** 止まったら気象庁 CSV から作り直す
   (https://www.data.jma.go.jp/eqev/data/kyoshin/jma-shindo.html)。
-- **停止推定のしきい値。** 各社の運転規制値 (一般に震度4〜5弱で規制、点検後再開) は
-  公開情報にばらつきがある。ここはまだ手を付けていない。
+- **対応表の穴。** 26 系統が未対応 (ODPT が 1 駅しか公開しておらず曖昧なもの)。
+  仙台空港線が落ちているのは空港アクセスとして痛い。手で足すか放置するか。
 
 ## 構成
 
@@ -132,16 +149,21 @@ src/                           ブラウザが直接読む ES モジュール
   rail/types.js                路線マスタの型 (JSDoc)
   rail/lines.js                路線マスタの読み込み
   rail/assign.js               震度 → 路線への割り当て
+  rail/systems.js              路線 → 運転系統への合成
 
 scripts/                       ビルド時のみ。配信には不要 (置いてあるだけ)
   build-shindo-data.mjs        観測点マスタ生成    npm run data:shindo
   build-rail-data.mjs          路線マスタ生成      npm run data:rail
+  build-line-map.mjs           運転系統の対応表     npm run data:linemap
   lib/unzip.mjs                N02 の ZIP 展開 (依存ゼロ)
+  lib/match-lines.mjs          運転系統 → N02 路線の照合
   verify-spatialize.mjs        震度の空間化を検証  npm run verify:shindo
   verify-rail.mjs              路線割り当てを検証  npm run verify:rail
+  verify-systems.mjs           系統への合成を検証  npm run verify:systems
 
 jsconfig.json                  JSDoc の型検査だけの設定  npx tsc
 .cache/                        N02 の zip 15MB (gitignore 済み)
+.env.local                     ODPT の鍵 (gitignore 済み)。.env.local.example を参照
 ```
 
 **`<base href="./">`** を `index.html` に入れてある。Pages のプロジェクトページは
@@ -155,4 +177,4 @@ jsconfig.json                  JSDoc の型検査だけの設定  npx tsc
 ---
 
 出典: 国土数値情報（鉄道データ）国土交通省 — CC BY 4.0 /
-気象庁 震度観測点一覧表 / P2P地震情報 API v2
+気象庁 震度観測点一覧表 / P2P地震情報 API v2 / 公共交通オープンデータセンター (ODPT)

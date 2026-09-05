@@ -7,9 +7,22 @@
 // 手で対応表を書くと N02 の改版で静かに腐るが、駅から導けば
 // 被覆率という形で壊れたことが分かる。
 
-/** 駅名の表記ゆれを吸収する。全角半角・中黒・末尾の「駅」。 */
-export const normalizeStationName = (s) =>
-  s.normalize('NFKC').replace(/[\s・･]/g, '').replace(/駅$/, '')
+// ODPT と N02 で駅名の表記が割れる箇所。実データで出たものだけ入れてある。
+const VARIANTS = [
+  // 市ケ谷/市ヶ谷、阿佐ケ谷/阿佐ヶ谷、霞ケ関/霞ヶ関 … 未一致の最大の原因だった
+  [/[ヶゕヵ]/g, 'ケ'],
+  // 麴町/麹町。異体字なので NFKC では揃わない
+  [/麴/g, '麹'],
+  // 明治神宮前〈原宿〉のような別称の併記
+  [/〈[^〉]*〉/g, ''],
+]
+
+/** 駅名の表記ゆれを吸収する。全角半角・中黒・末尾の「駅」・異体字。 */
+export const normalizeStationName = (s) => {
+  let out = s.normalize('NFKC')
+  for (const [pattern, to] of VARIANTS) out = out.replace(pattern, to)
+  return out.replace(/[\s・･]/g, '').replace(/駅$/, '')
+}
 
 const EARTH_RADIUS_KM = 6371
 const toRad = (deg) => (deg * Math.PI) / 180
@@ -102,6 +115,27 @@ export function matchSystem(system, byName) {
       operator: sample.operator,
       lineName: sample.lineName,
       stations: best.gain,
+    })
+  }
+
+  // ODPT が 1〜2 駅しか公開していない系統がある (多くは接続駅だけ)。
+  // 投票では拾えないが、その駅を含む N02 路線が 1 本しかないなら曖昧さが無い。
+  // 複数あるなら当てない — 誤った路線を「揺れている」と言う方が、
+  // 分からないと言うより悪い。
+  if (chosen.length === 0 && system.stations.length <= 2) {
+    perStation.forEach((cands, i) => {
+      const lineIds = new Set(cands.map((c) => c.lineId))
+      if (lineIds.size !== 1) return
+      const c = cands[0]
+      if (chosen.some((x) => x.lineId === c.lineId)) return
+      chosen.push({
+        lineId: c.lineId,
+        operator: c.operator,
+        lineName: c.lineName,
+        stations: 1,
+        unambiguousSingle: true,
+      })
+      covered.add(i)
     })
   }
 
