@@ -278,8 +278,13 @@ function settingsPanel(lang) {
     <h2>${esc(s.settings)}</h2>
     <label>${esc(s.homeTitle)}</label>
     <p class="detail">${config.home ? esc(config.home.name || `${config.home.lat}, ${config.home.lon}`) : esc(s.noHome)}</p>
+    <p class="note">${esc(s.homeHelp)}</p>
+    <div class="picker">
+      <input id="home-search" type="search" placeholder="${esc(s.searchHome)}" autocomplete="off">
+      <ul id="home-results"></ul>
+    </div>
     <div class="row">
-      ${state.here ? `<button class="primary" data-sethome="1">${esc(s.setHome)}</button>` : ''}
+      ${state.here ? `<button class="link" data-sethome="1">${esc(s.setHome)}</button>` : ''}
       ${config.home ? `<button class="link" data-clearhome="1">${esc(s.clear)}</button>` : ''}
     </div>
     <label for="airport">${esc(s.chooseAirport)}</label>
@@ -424,12 +429,26 @@ function wire() {
     }
   })
 
-  const search = $('here-search')
-  if (search) search.oninput = () => renderResults(search.value)
+  wireSearch('here-search', 'here-results', (place) => {
+    state.here = place
+    saveHere()
+    render()
+  })
+  // 宿は「そこにいるうちに」ではなく、いつでも駅から選べる必要がある。
+  wireSearch('home-search', 'home-results', (place) => {
+    config.home = place
+    writeConfig(config)
+    render()
+  })
 }
 
-function renderResults(query) {
-  const list = $('here-results')
+function wireSearch(inputId, listId, onPick) {
+  const input = $(inputId)
+  if (input) input.oninput = () => renderResults(input.value, listId, onPick)
+}
+
+function renderResults(query, listId, onPick) {
+  const list = $(listId)
   if (!list) return
   const trimmed = query.trim()
   if (trimmed.length < 2) {
@@ -449,11 +468,8 @@ function renderResults(query) {
     .join('')
 
   for (const b of list.querySelectorAll('button')) {
-    b.onclick = () => {
-      state.here = { lat: Number(b.dataset.lat), lon: Number(b.dataset.lon), name: b.dataset.name }
-      saveHere()
-      render()
-    }
+    b.onclick = () =>
+      onPick({ lat: Number(b.dataset.lat), lon: Number(b.dataset.lon), name: b.dataset.name })
   }
 }
 
