@@ -4,8 +4,12 @@
 // ODPT の odpt:Station は全駅に英語名を持っている。
 //
 // 出力: data/places.json
-//   stations … 日英の駅名 + 座標 + その駅を通る運転系統 / N02 路線
-//   airports … 主要空港と、そこへ行く運転系統 / N02 路線
+//   stations       … 日英の駅名 + 座標 + その駅を通る運転系統 / N02 路線
+//   airports       … 主要空港と、そこへ行く運転系統 / N02 路線
+//   municipalities … 市区町村コード → 都道府県+市区町村名
+//
+// 市区町村表は現在地を住所で出すために要る。国土地理院の逆ジオコーディングは
+// 市区町村コードと町名しか返さないので、コードを名前に直す表を手元に持つ。
 //
 // ODPT が収録しているのはほぼ関東の事業者なので、関西以西では運転系統が付かない。
 // N02 の路線 ID も持たせておけば、運行情報での確定はできなくても停止推定はできる。
@@ -25,6 +29,10 @@ const SOURCES = [
   { env: 'ODPT_CHALLENGE_KEY', base: 'https://api-challenge.odpt.org/api/v4' },
 ]
 const PUBLIC_BASE = 'https://api-public.odpt.org/api/v4'
+
+// 地理院地図が使っている市区町村コード表。
+// 1 行が「都道府県コード,都道府県名,市区町村コード,市区町村名」。
+const MUNI_URL = 'https://maps.gsi.go.jp/js/muni.js'
 
 /**
  * 出国便の起点になる空港。訪日外国人が実際に発つところに絞る。
@@ -237,6 +245,21 @@ async function main() {
     })
   }
 
+  // 市区町村コード → 「都道府県名 + 市区町村名」。
+  const municipalities = {}
+  try {
+    const text = await (await fetch(MUNI_URL)).text()
+    for (const [, code, row] of text.matchAll(/GSI\.MUNI_ARRAY\["(\d+)"\]\s*=\s*'([^']*)'/g)) {
+      const cols = row.split(',')
+      if (cols.length < 4) continue
+      // 「札幌市　中央区」のように全角空白が入る行がある。詰める。
+      municipalities[code] = (cols[1] + cols[3]).replace(/[\s　]/g, '')
+    }
+    console.log(`市区町村: ${Object.keys(municipalities).length}`)
+  } catch (err) {
+    console.log(`市区町村表を取得できなかった (${err.message})。住所表示は町名だけになる`)
+  }
+
   if (stations.length < 1000) throw new Error(`駅が ${stations.length} 件しかない。取得に失敗している`)
 
   await mkdir(outDir, { recursive: true })
@@ -248,6 +271,7 @@ async function main() {
       airportCount: airports.length,
       stations,
       airports,
+      municipalities,
     }),
   )
 

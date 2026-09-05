@@ -107,7 +107,9 @@ const STRINGS = {
     actMove: '電車は動いています。時間に余裕を持って。',
     actShelter: '今夜泊まれる場所を探す。駅で待たないこと。',
 
-    shelterHelp: '地震のときに避難できる場所です。市区町村が指定しています。',
+    shelterHelp: '建物が危ないときや火災から逃げるときに向かう場所です。市区町村が指定しています。',
+    shelterUnverified: '開設しているかどうかは、ここでは分かりません。',
+    shelterStayPut: 'いま安全な建物の中にいるなら、まず動かないこと。日本では地震のあと一斉に移動しないよう求められています。',
     shelterOpen: '避難場所を見る',
     shelterNone: 'この場所の近くに登録された避難場所がありません。',
     shelterLoading: '避難場所を探しています…',
@@ -217,7 +219,9 @@ const STRINGS = {
     actMove: 'Trains are moving. Allow extra time.',
     actShelter: 'Find somewhere to stay tonight. Do not wait at the station.',
 
-    shelterHelp: 'Places designated by the city for people to evacuate to in an earthquake.',
+    shelterHelp: 'Where to go if your building is unsafe or you need to escape a fire. Designated by the city.',
+    shelterUnverified: 'Whether a site is actually open cannot be confirmed here.',
+    shelterStayPut: 'If you are in a safe building, stay put first. Japan asks people not to all move at once after a quake.',
     shelterOpen: 'Show evacuation sites',
     shelterNone: 'No registered evacuation site near this place.',
     shelterLoading: 'Looking for evacuation sites…',
@@ -327,7 +331,9 @@ const STRINGS = {
     actMove: '电车在运行。请留出充裕时间。',
     actShelter: '找地方过夜。不要在车站等。',
 
-    shelterHelp: '市区町村指定的、地震时可以前往避难的场所。',
+    shelterHelp: '当建筑物不安全或需要躲避火灾时前往的场所。由市区町村指定。',
+    shelterUnverified: '这里无法确认该场所是否已经开放。',
+    shelterStayPut: '如果你现在在安全的建筑物内，请先不要移动。日本要求地震后不要一齐外出。',
     shelterOpen: '查看避难场所',
     shelterNone: '这一带没有登记的避难场所。',
     shelterLoading: '正在查找避难场所…',
@@ -437,7 +443,9 @@ const STRINGS = {
     actMove: '전철은 움직이고 있습니다. 시간을 넉넉히 잡으세요.',
     actShelter: '오늘 밤 묵을 곳을 찾으세요. 역에서 기다리지 마세요.',
 
-    shelterHelp: '지진 시 대피할 수 있도록 지자체가 지정한 장소입니다.',
+    shelterHelp: '건물이 위험하거나 화재를 피해야 할 때 가는 장소입니다. 지자체가 지정합니다.',
+    shelterUnverified: '실제로 개설되어 있는지는 여기서 확인할 수 없습니다.',
+    shelterStayPut: '안전한 건물 안에 있다면 우선 움직이지 마세요. 일본에서는 지진 후 한꺼번에 이동하지 않도록 요청하고 있습니다.',
     shelterOpen: '대피 장소 보기',
     shelterNone: '이 부근에 등록된 대피 장소가 없습니다.',
     shelterLoading: '대피 장소를 찾는 중…',

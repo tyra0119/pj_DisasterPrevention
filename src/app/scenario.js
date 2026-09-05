@@ -55,10 +55,9 @@ export async function loadScenarios(baseUrl) {
  *
  * @param {Scenario} scenario
  * @param {StationIndex} index
- * @param {'ja'|'en'} lang
  * @returns {QuakeEvent}
  */
-export function buildScenarioEvent(scenario, index, lang) {
+export function buildScenarioEvent(scenario, index) {
   const top = SHINDO_ORDER[scenario.maxLevel]
   const occurredAt = new Date(Date.now() - scenario.minutesAgo * 60000).toISOString()
 
@@ -86,7 +85,8 @@ export function buildScenarioEvent(scenario, index, lang) {
     occurredAt,
     issuedAt: occurredAt,
     hypocenter: {
-      name: lang === 'en' ? scenario.hypocenter.en : scenario.hypocenter.ja,
+      name: scenario.hypocenter.ja,
+      nameEn: scenario.hypocenter.en,
       lat: scenario.hypocenter.lat,
       lon: scenario.hypocenter.lon,
       depthKm: null,

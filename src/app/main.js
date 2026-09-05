@@ -12,8 +12,10 @@ import { formatDuration, LANGS, locale, t } from './i18n.js'
 import { readConfig, writeConfig } from './config.js'
 import { buildLookup, situationAt } from './situation.js'
 import { buildScenarioEvent, loadScenarios } from './scenario.js'
+import { hypocenterName, refreshHypocenterNames } from '../quake/jma.js'
 import { mapFrame, paintMaps } from './map.js'
 import { sheltersNear } from './shelters.js'
+import { addressAt } from './address.js'
 
 /** これより前の地震は、いま動くかどうかの判断には効かない。 */
 const RELEVANT_HOURS = 12
@@ -41,9 +43,18 @@ const state = {
   showLines: new Set(),
   /** 避難場所は開いたときに取りに行く。取れたら覚えておく。 */
   shelters: /** @type {{key: string, list: any[]|null}} */ ({ key: '', list: null }),
+  /** 現在地の住所。逆ジオコーディングで引く。 */
+  address: /** @type {{key: string, text: string|null}} */ ({ key: '', text: null }),
 }
 let data = null
 let analysis = null
+
+/**
+ * 日本語以外はすべて英語に寄せる。中国語・韓国語の対訳が無いものが多く、
+ * 日本語のまま出すより英語の方が読める人が多い。
+ * @param {string} ja @param {string|null|undefined} en @param {string} lang
+ */
+const pick = (ja, en, lang) => (lang === 'ja' ? ja || en || '' : en || ja || '')
 
 const $ = (id) => document.getElementById(id)
 const esc = (s) =>
@@ -106,10 +117,13 @@ async function refresh() {
   if (scenario) {
     state.fetchedAt = new Date()
     state.stale = false
-    analysis = analyse(buildScenarioEvent(scenario, data.index, config.lang))
+    analysis = analyse(buildScenarioEvent(scenario, data.index))
     render()
     return
   }
+
+  // 震源地名の対訳を拾っておく。失敗しても日本語名で動く。
+  refreshHypocenterNames()
 
   try {
     let events = await fetchRecent(data.index, { limit: PAGE })
@@ -150,6 +164,10 @@ function analyse(event) {
  */
 function nameForCoords(lat, lon, lang) {
   const s = t(lang)
+  // 住所が引けているならそれを出す。駅名より正確で、人に見せられる。
+  if (state.address.key === `${lat.toFixed(4)},${lon.toFixed(4)}` && state.address.text) {
+    return state.address.text
+  }
   if (!data?.places) return s.coordsOnly(lat.toFixed(3), lon.toFixed(3))
 
   let best = null
@@ -160,7 +178,25 @@ function nameForCoords(lat, lon, lang) {
     if (!best || d < best.d) best = { d, st }
   }
   if (!best) return s.coordsOnly(lat.toFixed(3), lon.toFixed(3))
-  return s.nearStation(lang === 'ja' || lang === 'zh' || lang === 'ko' ? best.st.ja : best.st.en)
+  return s.nearStation(pick(best.st.ja, best.st.en, lang))
+}
+
+/**
+ * 現在地の住所。引けていなければ引きに行き、取れたら描き直す。
+ * 住所は人に見せられる。言葉が通じないとき、これが一番効く。
+ */
+function addressFor(place) {
+  if (!place?.geo || !data?.places) return null
+  const key = `${place.lat.toFixed(4)},${place.lon.toFixed(4)}`
+  if (state.address.key === key) return state.address.text
+
+  state.address = { key, text: null }
+  addressAt(place.lat, place.lon, data.places.municipalities).then((text) => {
+    if (state.address.key !== key || !text) return
+    state.address = { key, text }
+    render()
+  })
+  return null
 }
 
 const situation = (place, hint) =>
@@ -339,7 +375,7 @@ function verdictBlock(lang) {
 function lineList(sit, lang) {
   return sit.lines
     .map((l) => {
-      const name = lang === 'en' && l.titleEn ? l.titleEn : l.title
+      const name = pick(l.title, l.titleEn, lang)
       const advice = l.suspension.advice
       return `<li><span class="ln">${esc(name)}</span><span class="chip c-${advice}">${esc(t(lang)[CHIP_KEY[advice]])}</span></li>`
     })
@@ -371,6 +407,13 @@ function rowPanel(entry, lang) {
   const parts = []
 
   if (entry.id === 'here') {
+    if (entry.place?.geo) {
+      // 住所は行の見出しに出ている。ここは座標だけ。二度書くと読み飛ばされる。
+      addressFor(entry.place)
+      parts.push(
+        `<p class="addr"><span class="addr-sub">${esc(s.coordsOnly(entry.place.lat.toFixed(4), entry.place.lon.toFixed(4)))}</span></p>`,
+      )
+    }
     parts.push(`<div class="rowacts">
       <button class="pill" data-locate="1">${esc(entry.place ? s.recheckLocation : s.setLocation)}</button>
     </div>`)
@@ -414,14 +457,28 @@ function rowPanel(entry, lang) {
   return `<div class="panel">${parts.join('')}</div>`
 }
 
-const airportName = (a, lang) => (lang === 'ja' ? a.ja : a.en)
+const airportName = (a, lang) => pick(a.ja, a.en, lang)
 
 /** 現在地は座標で持つ。表示名は言語が変われば変わるので、その都度作る。 */
+/**
+ * その座標にある駅。共有リンクは日本語名しか運ばないので、
+ * 英語名が要るときは座標から引き直す。約 400m まで同じ駅とみなす。
+ */
+function stationAt(lat, lon) {
+  if (!data?.places) return null
+  return (
+    data.places.stations.find(
+      (st) => Math.abs(st.lat - lat) < 0.004 && Math.abs(st.lon - lon) < 0.004,
+    ) ?? null
+  )
+}
+
 function placeName(place, lang) {
   if (!place) return ''
   if (place.geo) return nameForCoords(place.lat, place.lon, lang)
-  if (lang === 'en' && place.en) return place.en
-  return place.name || place.en || '—'
+  // 片方しか無いときは座標から補う。日本語以外は英語に寄せる。
+  const st = place.name && place.en ? null : stationAt(place.lat, place.lon)
+  return pick(place.name || st?.ja, place.en || st?.en, lang) || '—'
 }
 
 function placeRow(entry, lang) {
@@ -598,6 +655,7 @@ function shelterSection(lang) {
   return `<li class="place open">${head}
     <div class="panel">
       <p class="hint">${esc(s.shelterHelp)}</p>
+      <p class="hint warn-note">${esc(s.shelterStayPut)}</p>
       ${mapFrame({
         center: me,
         fit: [me, ...list.map((x) => ({ lat: x.lat, lon: x.lon }))],
@@ -605,6 +663,7 @@ function shelterSection(lang) {
         note: esc(s.shelterMapNote),
       })}
       <ul class="shelters">${rows}</ul>
+      <p class="hint">${esc(s.shelterUnverified)}</p>
     </div>
   </li>`
 }
@@ -638,7 +697,7 @@ function body(lang) {
   const e = analysis.event
   const quakeLine = e
     ? `<p class="quake${config.eventId === e.id ? ' past' : ''}">
-         ${e.magnitude ? `${esc(s.magnitude(e.magnitude))} · ` : ''}${esc(e.hypocenter.name)} · ${esc(jstTime(e.occurredAt, lang))}
+         ${e.magnitude ? `${esc(s.magnitude(e.magnitude))} · ` : ''}${esc(hypocenterName(e.hypocenter, lang))} · ${esc(jstTime(e.occurredAt, lang))}
          ${config.eventId === e.id ? `<span class="past-note">${esc(s.pastEvent(jstFull(new Date(e.occurredAt), lang)))}</span>` : ''}
        </p>`
     : ''
@@ -807,8 +866,8 @@ function renderResults(input, listId, onPick) {
     .map(
       (s) =>
         `<button class="hit" data-lat="${s.lat}" data-lon="${s.lon}">
-          <span class="hit-main">${esc(config.lang === 'en' ? s.en : s.ja)}</span>
-          <span class="hit-sub">${esc(config.lang === 'en' ? s.ja : s.en)}</span>
+          <span class="hit-main">${esc(pick(s.ja, s.en, config.lang))}</span>
+          <span class="hit-sub">${esc(config.lang === 'ja' ? s.en : s.ja)}</span>
         </button>`,
     )
     .join('')

@@ -11,7 +11,8 @@ import { detectLang, LANG_CODES } from './i18n.js'
 /**
  * @typedef {object} Config
  * @property {import('./i18n.js').Lang} lang
- * @property {{lat:number, lon:number, name:string}|null} home  宿。
+ * @property {{lat:number, lon:number, name:string, en?:string}|null} home
+ *   宿。name は日本語、en は英語。共有リンクには両方載せる。
  * @property {string|null} flightAirport  IATA コード。
  * @property {string|null} flightDeparture  出発時刻 (ISO8601 のローカル表記)。
  * @property {string|null} eventId
@@ -46,7 +47,7 @@ export function readConfig(search = location.search) {
     const [lat, lon] = raw.split(',').map(num)
     // 日本の範囲外の座標はクエリの壊れとみなす。
     if (lat != null && lon != null && lat > 20 && lat < 46 && lon > 122 && lon < 154) {
-      home = { lat, lon, name: q.get('homeName') || '' }
+      home = { lat, lon, name: q.get('homeName') || '', en: q.get('homeNameEn') || '' }
     }
   }
 
@@ -70,6 +71,7 @@ export function writeConfig(config) {
   if (config.home) {
     q.set('home', `${config.home.lat.toFixed(4)},${config.home.lon.toFixed(4)}`)
     if (config.home.name) q.set('homeName', config.home.name)
+    if (config.home.en) q.set('homeNameEn', config.home.en)
   }
   if (config.flightAirport) q.set('flight', config.flightAirport)
   if (config.flightDeparture) q.set('dep', config.flightDeparture)

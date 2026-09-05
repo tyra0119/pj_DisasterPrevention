@@ -160,6 +160,10 @@
       .panel { padding: .2rem .15rem 1rem; }
       .panel .hint, .settings .hint { margin: 0 0 .6rem; font-size: .82rem; color: var(--muted); }
       .rowacts { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; }
+      /* 住所は人に見せるもの。読める大きさで、選んでコピーできるようにする。 */
+      .addr { margin: 0 0 .6rem; user-select: text; }
+      .addr-main { display: block; font-size: .95rem; font-weight: 600; }
+      .addr-sub { display: block; font-size: .74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
       .field { margin-bottom: .7rem; }
       .field label {
         display: block; margin-bottom: .25rem;
@@ -244,6 +248,11 @@
         background: rgba(0, 0, 0, .68); padding: .05rem .3rem; border-radius: .25rem;
       }
 
+      /* 「まず動かない」は避難場所の一覧より先に読ませたい。 */
+      .warn-note {
+        border-left: 3px solid var(--c-delay); padding-left: .6rem;
+        color: var(--fg) !important;
+      }
       ul.shelters { list-style: none; margin: 0; padding: 0; }
       ul.shelters li {
         display: grid; grid-template-columns: auto 1fr auto;

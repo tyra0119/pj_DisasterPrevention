@@ -62,7 +62,9 @@ export const SHINDO_ORDER = {
  * @property {string} id
  * @property {string} occurredAt  発生時刻 (ISO8601, +09:00)。
  * @property {string} issuedAt    情報の発表時刻 (ISO8601, +09:00)。
- * @property {{name: string, lat: number|null, lon: number|null, depthKm: number|null}} hypocenter
+ * @property {{name: string, nameEn?: string|null, lat: number|null, lon: number|null, depthKm: number|null}} hypocenter
+ *   name は日本語。nameEn は想定シナリオだけが持つ。実データの英語名は
+ *   気象庁の一覧から引く (src/quake/jma.js)。
  * @property {number|null} magnitude
  * @property {ShindoLevel|null} maxLevel
  * @property {'area'|'station'} resolution  詳細が出るまでは 'area' 止まり。
