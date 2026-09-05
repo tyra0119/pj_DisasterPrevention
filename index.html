@@ -1,142 +1,228 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1117" />
     <!-- Pages のプロジェクトページは /<repo>/ 配下に載る。相対基準にしておくと
          ローカルの http-server でも同じ URL 解決になる。 -->
     <base href="./" />
-    <title>震度 → 路線 割り当て確認</title>
+    <title>Can I Get Back?</title>
+    <meta
+      name="description"
+      content="After an earthquake in Japan, find out whether the trains you need are likely running — in plain terms, in English or Japanese."
+    />
     <style>
-      :root { color-scheme: light dark; }
-      body {
-        margin: 0; padding: 1.25rem;
-        font: 15px/1.6 system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
-        max-width: 60rem; margin-inline: auto;
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #14181d;
+        --muted: #5b6672;
+        --line: #e2e6ea;
+        --card: #f7f9fa;
+        --ok: #1a7f4b;
+        --ok-bg: #e8f6ee;
+        --warn: #9a6100;
+        --warn-bg: #fdf3e0;
+        --stop: #b3261e;
+        --stop-bg: #fdecea;
+        --grave: #6a1b9a;
+        --grave-bg: #f4e9f8;
       }
-      h1 { font-size: 1.1rem; margin: 0 0 .25rem; }
-      .sub { opacity: .7; font-size: .85rem; margin: 0 0 1.25rem; }
-      .card { border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-              border-radius: 8px; padding: .9rem 1rem; margin-bottom: 1rem; }
-      .card h2 { font-size: .9rem; margin: 0 0 .6rem; opacity: .8; font-weight: 600; }
-      dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .9rem; margin: 0; }
-      dt { opacity: .65; }
-      dd { margin: 0; }
-      table { border-collapse: collapse; width: 100%; font-size: .88rem; }
-      th, td { text-align: left; padding: .3rem .5rem; border-bottom: 1px solid
-               color-mix(in srgb, currentColor 12%, transparent); white-space: nowrap; }
-      th { opacity: .6; font-weight: 600; }
-      td.level { font-variant-numeric: tabular-nums; font-weight: 700; }
-      .wrap { overflow-x: auto; }
-      .muted { opacity: .55; }
-      footer { font-size: .78rem; opacity: .6; margin-top: 2rem; }
-      code { font-size: .85em; }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d1117;
+          --fg: #e7edf3;
+          --muted: #97a3b0;
+          --line: #232a33;
+          --card: #151b23;
+          --ok: #56d18b;
+          --ok-bg: #10241a;
+          --warn: #e8b45a;
+          --warn-bg: #26200f;
+          --stop: #ff8a80;
+          --stop-bg: #2a1516;
+          --grave: #d8a8f0;
+          --grave-bg: #23162b;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      #app {
+        max-width: 34rem;
+        margin-inline: auto;
+        padding: 1rem 1rem 3rem;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-block: .5rem 1rem;
+      }
+      .brand h1 { font-size: 1.35rem; margin: 0; letter-spacing: -.01em; }
+      .brand p { margin: .15rem 0 0; color: var(--muted); font-size: .85rem; }
+      .controls { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+        border-radius: .5rem;
+      }
+      button.link {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        text-decoration: underline;
+        text-underline-offset: .2em;
+        padding: .25rem 0;
+        font-size: .85rem;
+      }
+      button.lang {
+        background: none;
+        border: 1px solid var(--line);
+        color: var(--fg);
+        padding: .3rem .6rem;
+        font-size: .8rem;
+      }
+      button.primary {
+        background: var(--fg);
+        color: var(--bg);
+        border: 0;
+        padding: .6rem 1rem;
+        font-weight: 600;
+      }
+
+      .stamp {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: .5rem;
+        margin: 0 0 1rem;
+        font-size: .78rem;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .stamp .warn { color: var(--warn); font-weight: 600; }
+
+      .quake {
+        border-left: 3px solid var(--line);
+        padding-left: .75rem;
+        margin-bottom: 1rem;
+      }
+      .quake p { margin: 0; font-size: .9rem; color: var(--muted); }
+      .quake.past { border-left-color: var(--warn); }
+      .past-note { color: var(--warn) !important; font-weight: 600; margin-top: .25rem !important; }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: .75rem;
+        padding: 1rem;
+        margin-bottom: .85rem;
+      }
+      .card h2 {
+        font-size: .78rem;
+        margin: 0 0 .5rem;
+        color: var(--muted);
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+      }
+      .where { margin: 0 0 .35rem; font-size: .95rem; font-weight: 600; }
+      .verdict { margin: 0; font-size: 1.3rem; font-weight: 700; line-height: 1.3; }
+      .detail { margin: .35rem 0 0; color: var(--muted); font-size: .9rem; }
+      .note { margin: .35rem 0 0; font-size: .85rem; color: var(--muted); }
+
+      /* 結論の重さを色で。数値ではなく色と言葉で判断できるように。 */
+      .adv-normal { border-left: 4px solid var(--ok); }
+      .adv-normal .verdict { color: var(--ok); }
+      .adv-delay { border-left: 4px solid var(--warn); background: var(--warn-bg); }
+      .adv-delay .verdict { color: var(--warn); }
+      .adv-wait { border-left: 4px solid var(--stop); background: var(--stop-bg); }
+      .adv-wait .verdict { color: var(--stop); }
+      .adv-avoid-rail { border-left: 4px solid var(--grave); background: var(--grave-bg); }
+      .adv-avoid-rail .verdict { color: var(--grave); }
+
+      ul.lines { list-style: none; margin: .6rem 0 0; padding: 0; }
+      ul.lines li {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: .75rem;
+        padding: .35rem 0;
+        border-top: 1px solid var(--line);
+        font-size: .88rem;
+      }
+      .tag { font-size: .72rem; white-space: nowrap; color: var(--muted); }
+      .tag.t-wait { color: var(--stop); }
+      .tag.t-delay { color: var(--warn); }
+      .tag.t-normal { color: var(--ok); }
+      .tag.t-avoid-rail { color: var(--grave); }
+
+      .picker { margin-top: .75rem; }
+      .picker input, .settings input, .settings select {
+        width: 100%;
+        font: inherit;
+        padding: .55rem .7rem;
+        border: 1px solid var(--line);
+        border-radius: .5rem;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      #here-results { list-style: none; margin: .5rem 0 0; padding: 0; }
+      #here-results li { border-top: 1px solid var(--line); }
+      #here-results button {
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: 0;
+        color: var(--fg);
+        padding: .5rem 0;
+        font-size: .9rem;
+      }
+
+      .settings label {
+        display: block;
+        margin: .9rem 0 .3rem;
+        font-size: .78rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-top: .9rem; }
+
+      .caveat {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: .78rem;
+      }
+      .caveat h2 { font-size: .78rem; margin: 0 0 .3rem; color: var(--fg); }
+      .caveat p { margin: 0 0 .5rem; }
+      .caveat .src { font-size: .72rem; }
+      a { color: inherit; }
     </style>
   </head>
   <body>
-    <h1>震度 → 路線 割り当て確認</h1>
-    <p class="sub">
-      製品の画面ではなく、データ経路が実ブラウザで通ることを確かめるためのページ。
-      直近で一番強かった地震を取り、全路線に震度を割り当てる。
-    </p>
-
-    <div class="card" id="status"><h2>状態</h2><p>読み込み中…</p></div>
-    <div class="card" id="event" hidden></div>
-    <div class="card" id="airports" hidden></div>
-    <div class="card" id="lines" hidden></div>
-
-    <footer>
-      出典: 国土数値情報（鉄道データ）国土交通省 — CC BY 4.0 ／
-      気象庁 震度観測点一覧表 ／ P2P地震情報 API v2
-    </footer>
-
+    <main id="app"></main>
     <script type="module">
-      import { loadIndex } from './src/quake/stations.js'
-      import { fetchRecent } from './src/quake/p2p.js'
-      import { prepareField } from './src/quake/field.js'
-      import { SHINDO_ORDER } from './src/quake/types.js'
-      import { loadRailData } from './src/rail/lines.js'
-      import { assignToLines } from './src/rail/assign.js'
+      import { start } from './src/app/main.js'
+      start()
 
-      const $ = (id) => document.getElementById(id)
-      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
-      const show = (el, html) => { el.innerHTML = html; el.hidden = false }
-
-      // 最終取得時刻は必ず出す。オフラインでも「いつの情報か」が分からないと判断できない。
-      const stamp = (d) =>
-        new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Tokyo' }).format(d)
-
-      const AIRPORT_LINES = [
-        ['京成電鉄', '成田空港線'],
-        ['東日本旅客鉄道', '成田線'],
-        ['東京モノレール', '東京モノレール羽田空港線'],
-        ['京浜急行電鉄', '空港線'],
-        ['南海電気鉄道', '空港線'],
-        ['西日本旅客鉄道', '関西空港線'],
-      ]
-
-      try {
-        const t0 = performance.now()
-        const [index, rail] = await Promise.all([loadIndex(), loadRailData()])
-        const loadedMs = performance.now() - t0
-
-        const events = (await fetchRecent(index, { limit: 100 }))
-          .filter((e) => e.resolution === 'station' && e.maxLevel)
-          .sort((a, b) => SHINDO_ORDER[b.maxLevel] - SHINDO_ORDER[a.maxLevel])
-        const fetchedAt = new Date()
-
-        if (!events.length) {
-          show($('status'), '<h2>状態</h2><p>直近 100 件に観測点単位の地震情報がなかった。</p>')
-          throw new Error('no station-resolution event')
-        }
-
-        const event = events[0]
-        const t1 = performance.now()
-        const impacts = assignToLines(prepareField(event, index), rail.lines, { radiusKm: 20 })
-        const assignMs = performance.now() - t1
-
-        const points = rail.lines.reduce((n, l) => n + l.stations.length + l.track.length, 0)
-        show($('status'), `<h2>状態</h2><dl>
-          <dt>取得時刻</dt><dd>${stamp(fetchedAt)}</dd>
-          <dt>データ読込</dt><dd>${loadedMs.toFixed(0)}ms（観測点 ${index.stations.length} 点 / ${rail.count} 路線 ${points} 地点）</dd>
-          <dt>割り当て</dt><dd>${assignMs.toFixed(0)}ms</dd>
-          <dt>座標が引けなかった観測点</dt><dd>${event.unresolved.length}</dd>
-        </dl>`)
-
-        show($('event'), `<h2>対象の地震（直近で最も強いもの）</h2><dl>
-          <dt>震源</dt><dd>${esc(event.hypocenter.name)}</dd>
-          <dt>発生</dt><dd>${esc(event.occurredAt)}</dd>
-          <dt>規模</dt><dd>M${event.magnitude ?? '—'} / 最大震度 ${event.maxLevel}</dd>
-          <dt>観測点</dt><dd>${event.observations.length} 点</dd>
-        </dl>`)
-
-        const find = (op, name) => impacts.find((i) => i.line.operator === op && i.line.name === name)
-        show($('airports'), `<h2>空港アクセス</h2><div class="wrap"><table>
-          <tr><th>路線</th><th>震度</th><th>判定</th><th>最大の地点</th></tr>
-          ${AIRPORT_LINES.map(([op, name]) => {
-            const i = find(op, name)
-            if (!i) return `<tr><td>${esc(op)} ${esc(name)}</td><td colspan="3" class="muted">見つからない</td></tr>`
-            return `<tr><td>${esc(op)} ${esc(name)}</td>
-              <td class="level">${i.level ?? '—'}</td>
-              <td class="${i.level ? '' : 'muted'}">${i.confidence === 'reported' ? '観測' : i.confidence === 'below-threshold' ? '震度1未満' : '判定不能'}</td>
-              <td>${esc(i.at?.label ?? '—')}</td></tr>`
-          }).join('')}
-        </table></div>`)
-
-        const shaken = impacts.filter((i) => i.level)
-        show($('lines'), `<h2>揺れた路線 ${shaken.length} / ${impacts.length}（強い順 上位 25）</h2><div class="wrap"><table>
-          <tr><th>震度</th><th>事業者</th><th>路線</th><th>最大の地点</th><th>根拠の観測点</th></tr>
-          ${shaken.slice(0, 25).map((i) => `<tr>
-            <td class="level">${i.level}</td>
-            <td>${esc(i.line.operator)}</td>
-            <td>${esc(i.line.name)}</td>
-            <td>${esc(i.at?.label ?? '—')}</td>
-            <td class="muted">${esc(i.source?.label ?? '—')} ${i.source ? i.source.distanceKm.toFixed(1) + 'km' : ''}</td>
-          </tr>`).join('')}
-        </table></div>`)
-      } catch (err) {
-        $('status').innerHTML = `<h2>状態</h2><p>失敗: <code>${esc(err.message)}</code></p>`
-        throw err
+      // オフライン対応。地震のあとは回線が細るので、同梱データは端末に残す。
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {
+          // 登録できなくてもオンラインなら動く。
+        })
       }
     </script>
   </body>

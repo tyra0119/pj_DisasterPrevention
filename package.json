@@ -5,14 +5,15 @@
   "version": "0.0.0",
   "description": "Earthquake-aware travel guidance for visitors in Japan",
   "scripts": {
-    "data:build": "node scripts/build-shindo-data.mjs && node scripts/build-rail-data.mjs && node scripts/build-line-map.mjs",
+    "data:build": "node scripts/build-shindo-data.mjs && node scripts/build-rail-data.mjs && node scripts/build-line-map.mjs && node scripts/build-places.mjs",
     "data:shindo": "node scripts/build-shindo-data.mjs",
     "data:rail": "node scripts/build-rail-data.mjs",
     "data:linemap": "node scripts/build-line-map.mjs",
+    "data:places": "node scripts/build-places.mjs",
     "verify:shindo": "node scripts/verify-spatialize.mjs",
     "verify:rail": "node scripts/verify-rail.mjs",
     "verify:systems": "node scripts/verify-systems.mjs",
-    "typecheck": "tsc",
-    "verify:regulation": "node scripts/verify-regulation.mjs"
+    "verify:regulation": "node scripts/verify-regulation.mjs",
+    "typecheck": "tsc"
   }
 }

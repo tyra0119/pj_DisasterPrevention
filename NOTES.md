@@ -1,12 +1,14 @@
-# 震度 → 路線 → 運転系統 → 停止推定 — 検証メモ
+# 検証メモ
 
 訪日外国人向けの単体 Web アプリ。地震発生から 30 分〜数時間の
 「帰れるのか／飛べるのか」に答える。震度の数値ではなく、待つべきか動くべきかを出す。
 GitHub Pages でリポジトリ直下をそのまま配信する（遅延レーダーと同じ）ので、
 サーバもビルドも持たない。`src/` はプレーン JS で、型は JSDoc で持つ。
 
-震度分布 → 路線への割り当て → 運転系統への合成 → 停止推定、までを実データで通した。
-残るのは ODPT 運行情報での確定と、製品の画面。
+震度分布 → 路線への割り当て → 運転系統への合成 → 停止推定 → 画面、まで通した。
+残るのは ODPT 運行情報での確定。
+
+アプリは `index.html`、疎通確認は `diagnostics.html`。
 
 ## 結論
 
@@ -82,9 +84,10 @@ N02 は CC BY 4.0 なので、生成物を Pages に同梱して配れる。出�
 | `data/shindo-stations.json` | 観測点 4,360 点 | 775KB | 86KB |
 | `data/shindo-areas.json` | 細分区域 188 | 27KB | 6.6KB |
 | `data/rail-lines.json` | 596 路線 / 10,154 駅 / 17,189 線形点 | 1.05MB | 289KB |
-| `data/line-map.json` | 運転系統 190 → N02 路線の対応表 | 45KB | 7.1KB |
+| `data/line-map.json` | 運転系統 190 → N02 路線の対応表 | 79KB | 18KB |
+| `data/places.json` | 駅 1,479 (日英) / 空港 11 | 224KB | 42KB |
 
-合計 gzip 388KB。Service Worker で丸ごとプリキャッシュできる範囲。
+合計 gzip 441KB。Service Worker で丸ごとプリキャッシュできる範囲。
 
 **ODPT の鍵はビルド時にしか使わない。** 対応表は生成物として配るので、
 `data/line-map.json` にも Pages にも鍵は載らない (生成物を検査して確認済み)。
@@ -147,10 +150,10 @@ ODPT の運行情報は運転系統単位で来る。**運転系統 1 本 ↔ N0
 
 ## 残っている宿題
 
-- **製品の画面。** いま公開されているのは疎通確認ページで、震度をそのまま出している。
-  材料は揃ったので、あとは訪日外国人向けに翻訳する。次の山。
 - **ODPT 運行情報での確定。** `odpt:TrainInformation` を運転系統 ID で引けば繋がる。
-  実行時の鍵の扱いが先。
+  実行時の鍵の扱いが先。次の山。
+- **震源名が日本語のまま。** 英語表示でも「茨城県南部」と出る。
+  気象庁 bosai の JSON が `en_anm` を持っているので、そこから取る。
 - **半径は問いによって変える。** 路線は 20km でよいが、「今いる場所」を同じ半径で答えると
   12km 先の観測点の値を返してしまい悲観的すぎる。滞在地は 5km 前後で分ける。
 - **ODPT の鍵。** Pages は静的配信なので鍵が露出する。運行情報だけ薄いプロキシ
@@ -166,7 +169,9 @@ ODPT の運行情報は運転系統単位で来る。**運転系統 1 本 ↔ N0
 ビルドしないので、リポジトリ直下がそのままサイトのルートになる。
 
 ```
-index.html                     疎通確認ページ (製品の画面ではない)
+index.html                     アプリ本体
+diagnostics.html               疎通確認ページ
+sw.js                          オフライン対応
 .nojekyll                      Jekyll を通さない
 data/*.json                    同梱データ (生成物だがコミットする)
 src/                           ブラウザが直接読む ES モジュール
@@ -181,11 +186,16 @@ src/                           ブラウザが直接読む ES モジュール
   rail/assign.js               震度 → 路線への割り当て
   rail/systems.js              路線 → 運転系統への合成
   rail/regulation.js           停止推定 (待ち時間の幅)
+  app/i18n.js                  表示文言 (英語・日本語)
+  app/config.js                設定の URL クエリ入出力
+  app/situation.js             場所ごとの状況の組み立て
+  app/main.js                  画面
 
 scripts/                       ビルド時のみ。配信には不要 (置いてあるだけ)
   build-shindo-data.mjs        観測点マスタ生成    npm run data:shindo
   build-rail-data.mjs          路線マスタ生成      npm run data:rail
   build-line-map.mjs           運転系統の対応表     npm run data:linemap
+  build-places.mjs             駅(日英)と空港       npm run data:places
   lib/unzip.mjs                N02 の ZIP 展開 (依存ゼロ)
   lib/match-lines.mjs          運転系統 → N02 路線の照合
   verify-spatialize.mjs        震度の空間化を検証  npm run verify:shindo
