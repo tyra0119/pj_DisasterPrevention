@@ -200,56 +200,197 @@ const ADVICE_KEY = {
   wait: 'adviceWait',
   'avoid-rail': 'adviceAvoid',
 }
+const STATUS_KEY = {
+  normal: 'statusNormal',
+  delay: 'statusDelay',
+  wait: 'statusWait',
+  'avoid-rail': 'statusAvoid',
+}
+const LEAD_KEY = {
+  normal: 'leadNormal',
+  delay: 'leadDelay',
+  wait: 'leadWait',
+  'avoid-rail': 'leadAvoid',
+}
+const CHIP_KEY = {
+  normal: 'chipNormal',
+  delay: 'chipDelay',
+  wait: 'chipWait',
+  'avoid-rail': 'chipAvoid',
+}
+
+/** 重い順。判定はいちばん重い場所に合わせる。 */
+const ADVICE_RANK = { normal: 0, delay: 1, wait: 2, 'avoid-rail': 3 }
+
+/**
+ * 登録されている場所を、画面に出す順に並べて返す。
+ * 未設定のものも行として出す。設定していないことが分かる必要があるため。
+ */
+function places(lang) {
+  const s = t(lang)
+  const out = [
+    { id: 'here', label: s.hereTitle, place: state.here, hint: {} },
+    { id: 'home', label: s.homeTitle, place: config.home, hint: {} },
+  ]
+
+  const airport = config.flightAirport
+    ? data.places.airports.find((a) => a.iata === config.flightAirport)
+    : null
+  if (airport) {
+    out.push({
+      id: 'flight',
+      label: s.flightTitle,
+      place: { ...airport, name: `${lang === 'en' ? airport.en : airport.ja} (${airport.iata})` },
+      hint: { lineIds: airport.lines, systemIds: airport.systems },
+      airport,
+    })
+  } else {
+    out.push({ id: 'flight', label: s.flightTitle, place: null, hint: {} })
+  }
+  return out
+}
+
+/** 画面全体の判定。いちばん重い場所に合わせ、待ち時間は代表値を使う。 */
+function overall(lang) {
+  const s = t(lang)
+  if (!analysis.event) {
+    return { advice: 'normal', status: s.statusNormal, lead: s.leadNormal, wait: '', action: '' }
+  }
+
+  const known = places(lang).filter((p) => p.place)
+  if (known.length === 0) {
+    return { advice: 'unset', status: '', lead: s.noPlaces, wait: '', action: '' }
+  }
+
+  let worst = null
+  let representative = null
+  for (const p of known) {
+    const sit = situation(p.place, p.hint)
+    if (!worst || ADVICE_RANK[sit.worst.advice] > ADVICE_RANK[worst.advice]) worst = sit.worst
+    if (!representative || ADVICE_RANK[sit.typical.advice] > ADVICE_RANK[representative.advice]) {
+      representative = sit.typical
+    }
+  }
+
+  const advice = worst.advice
+  return {
+    advice,
+    status: s[STATUS_KEY[advice]],
+    lead: s[LEAD_KEY[advice]],
+    // 待ち時間は代表値。いちばん長い路線に引きずられると、
+    // 数駅戻るだけの人にまで長い時間を言うことになる。
+    //
+    // 平常時は出さない。被害の領域でも出さない
+    // (「見通し不明」はリード文がすでに言っていて、二度言うと読み飛ばされる)。
+    wait:
+      advice === 'normal' || advice === 'avoid-rail'
+        ? ''
+        : waitText(representative, analysis.event, lang),
+    action: whatNow(lang),
+  }
+}
+
+function whatNow(lang) {
+  const s = t(lang)
+  if (!analysis.event) return ''
+  const advices = places(lang)
+    .filter((p) => p.place)
+    .map((p) => situation(p.place, p.hint).worst.advice)
+  if (advices.includes('avoid-rail')) return s.actShelter
+  if (advices.includes('wait')) return s.actWait
+  return s.actMove
+}
+
+function verdictBlock(lang) {
+  const v = overall(lang)
+  if (v.advice === 'unset') {
+    return `<section class="verdict v-unset">
+      <p class="v-lead">${esc(v.lead)}</p>
+    </section>`
+  }
+  return `<section class="verdict v-${v.advice}">
+    <p class="v-status">${esc(v.status)}</p>
+    <p class="v-lead">${esc(v.lead)}</p>
+    ${v.wait ? `<p class="v-eta">${esc(v.wait)}</p>` : ''}
+    ${v.action ? `<p class="v-act">${esc(v.action)}</p>` : ''}
+  </section>`
+}
 
 function lineList(sit, lang) {
   return sit.lines
     .map((l) => {
       const name = lang === 'en' && l.titleEn ? l.titleEn : l.title
-      const label = t(lang)[ADVICE_KEY[l.suspension.advice]]
-      return `<li><span class="ln">${esc(name)}</span><span class="tag t-${l.suspension.advice}">${esc(label)}</span></li>`
+      const advice = l.suspension.advice
+      return `<li><span class="ln">${esc(name)}</span><span class="chip c-${advice}">${esc(t(lang)[CHIP_KEY[advice]])}</span></li>`
     })
     .join('')
 }
 
-function linesToggle(id, sit, lang) {
-  if (sit.lines.length === 0) return ''
+/** 未設定の場所を、その場で設定できる欄。 */
+function setupPanel(entry, lang) {
   const s = t(lang)
-  const open = state.showLines.has(id)
-  const label = open ? s.hideLines : `${s.showLines} (${s.linesAffected(sit.lines.length)})`
-  return `<button class="link" data-toggle="${esc(id)}">${esc(label)}</button>
-    ${open ? `<ul class="lines">${lineList(sit, lang)}</ul>` : ''}`
+  if (entry.id === 'here') {
+    return `<div class="panel">
+      <button class="primary" data-locate="1">${esc(s.setLocation)}</button>
+      <div class="picker">
+        <input id="here-search" type="search" placeholder="${esc(s.pickStation)}" autocomplete="off">
+        <ul id="here-results"></ul>
+      </div>
+    </div>`
+  }
+  if (entry.id === 'home') {
+    return `<div class="panel">
+      <p class="hint">${esc(s.homeHelp)}</p>
+      <div class="picker">
+        <input id="home-search" type="search" placeholder="${esc(s.searchHome)}" autocomplete="off">
+        <ul id="home-results"></ul>
+      </div>
+    </div>`
+  }
+  return `<div class="panel">
+    <p class="hint">${esc(s.chooseAirport)}</p>
+    <button class="primary" data-settings="1">${esc(s.settings)}</button>
+  </div>`
 }
 
-function placeCard(id, title, place, hint, lang) {
-  if (!place) return ''
+function placeRow(entry, lang) {
   const s = t(lang)
-  const sit = situation(place, hint)
-  const advice = sit.worst.advice
+  const open = state.showLines.has(entry.id)
+
+  if (!entry.place) {
+    return `<li class="place">
+      <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
+        <span class="p-label">${esc(entry.label)}</span>
+        <span class="p-name muted">${esc(s.tapToSet)}</span>
+        <span class="chip c-unset">${esc(s.notSet)}</span>
+      </button>
+      ${open ? setupPanel(entry, lang) : ''}
+    </li>`
+  }
+
+  // 対象の地震が無いときは場所ごとの計算そのものが無い (震度の場が作られない)。
+  // 設定した場所は名前だけ出す。
+  if (!analysis.event) {
+    return `<li class="place">
+      <div class="prow">
+        <span class="p-label">${esc(entry.label)}</span>
+        <span class="p-name">${esc(entry.place.name || '—')}</span>
+        <span class="chip c-normal">${esc(s.chipNormal)}</span>
+      </div>
+    </li>`
+  }
+
+  const sit = situation(entry.place, entry.hint)
   const unknown = sit.worst.stage === 'none' && sit.confidence === 'unknown'
+  const advice = sit.worst.advice
+  const chip = unknown ? s.chipUnknown : s[CHIP_KEY[advice]]
 
-  return `<section class="card adv-${advice}">
-    <h2>${esc(title)}</h2>
-    ${place.name ? `<p class="where">${esc(place.name)}</p>` : ''}
-    <p class="verdict">${esc(s[ADVICE_KEY[advice]])}</p>
-    <p class="detail">${esc(unknown ? s.unknownHere : waitText(sit.typical, analysis.event, lang))}</p>
-    ${linesToggle(id, sit, lang)}
-  </section>`
-}
-
-function flightCard(lang) {
-  if (!config.flightAirport) return ''
-  const airport = data.places.airports.find((a) => a.iata === config.flightAirport)
-  if (!airport) return ''
-
-  const s = t(lang)
-  const sit = situation(airport, { lineIds: airport.lines, systemIds: airport.systems })
-  const name = lang === 'en' ? airport.en : airport.ja
-
-  let timing = ''
-  if (config.flightDeparture && !isPastView()) {
+  // 出国便だけは「間に合うか」を行に出す。ここが判断の分かれ目になる。
+  let extra = ''
+  if (entry.id === 'flight' && config.flightDeparture && !isPastView()) {
     const untilMin = (new Date(config.flightDeparture).getTime() - Date.now()) / 60000
     if (untilMin <= 0) {
-      timing = `<p class="note">${esc(s.flightPassed)}</p>`
+      extra = `<p class="p-extra">${esc(s.flightPassed)}</p>`
     } else {
       const rem = remaining(sit.worst, analysis.event)
       // 再開してから空港まで移動する時間も要る。最悪側で見る。
@@ -261,29 +402,23 @@ function flightCard(lang) {
           : worstCase <= untilMin * 1.5
             ? s.flightTight
             : s.flightUnlikely
-      timing = `<p class="note">${esc(s.flightIn(formatDuration(untilMin, lang)))}</p>
-        <p class="detail">${esc(verdict)}</p>`
+      extra = `<p class="p-extra">${esc(s.flightIn(formatDuration(untilMin, lang)))} · ${esc(verdict)}</p>`
     }
   }
 
-  return `<section class="card adv-${sit.worst.advice}">
-    <h2>${esc(s.flightTitle)}</h2>
-    <p class="where">${esc(name)} (${esc(airport.iata)})</p>
-    <p class="verdict">${esc(s[ADVICE_KEY[sit.worst.advice]])}</p>
-    <p class="detail">${esc(waitText(sit.typical, analysis.event, lang))}</p>
-    ${timing}
-    ${linesToggle('flight', sit, lang)}
-  </section>`
-}
-
-function whatNow(lang) {
-  const s = t(lang)
-  const advices = []
-  if (state.here) advices.push(situation(state.here, {}).worst.advice)
-  if (config.home) advices.push(situation(config.home, {}).worst.advice)
-  if (advices.includes('avoid-rail')) return s.actShelter
-  if (advices.includes('wait')) return s.actWait
-  return s.actMove
+  return `<li class="place">
+    <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
+      <span class="p-label">${esc(entry.label)}</span>
+      <span class="p-name">${esc(entry.place.name || '—')}</span>
+      <span class="chip c-${unknown ? 'unset' : advice}">${esc(chip)}</span>
+    </button>
+    ${extra}
+    ${open && sit.lines.length
+      ? `<ul class="lines">${lineList(sit, lang)}</ul>`
+      : open
+        ? `<div class="panel"><p class="hint">${esc(s.unknownHere)}</p></div>`
+        : ''}
+  </li>`
 }
 
 function settingsPanel(lang) {
@@ -295,11 +430,11 @@ function settingsPanel(lang) {
     )
     .join('')
 
-  return `<section class="card settings">
+  return `<section class="settings">
     <h2>${esc(s.settings)}</h2>
     <label>${esc(s.homeTitle)}</label>
-    <p class="detail">${config.home ? esc(config.home.name || `${config.home.lat}, ${config.home.lon}`) : esc(s.noHome)}</p>
-    <p class="note">${esc(s.homeHelp)}</p>
+    <p class="value">${config.home ? esc(config.home.name || `${config.home.lat}, ${config.home.lon}`) : esc(s.noHome)}</p>
+    <p class="hint">${esc(s.homeHelp)}</p>
     <div class="picker">
       <input id="home-search" type="search" placeholder="${esc(s.searchHome)}" autocomplete="off">
       <ul id="home-results"></ul>
@@ -322,43 +457,20 @@ function settingsPanel(lang) {
 
 function body(lang) {
   const s = t(lang)
-  if (state.error && !analysis) {
-    return `<section class="card"><p class="detail">${esc(state.error)}</p></section>`
-  }
-  if (!analysis) {
-    return `<section class="card"><p class="detail">${esc(s.checking)}</p></section>`
-  }
-  if (!analysis.event) {
-    return `<section class="card adv-normal">
-      <h2>${esc(s.calmTitle)}</h2>
-      <p class="detail">${esc(s.calmBody)}</p>
-    </section>`
-  }
+  if (state.error && !analysis) return `<section class="verdict v-unset"><p class="v-lead">${esc(state.error)}</p></section>`
+  if (!analysis) return `<section class="verdict v-unset"><p class="v-lead">${esc(s.checking)}</p></section>`
 
   const e = analysis.event
-  const past = config.eventId === e.id
-  const here = state.here
-    ? placeCard('here', s.hereTitle, state.here, {}, lang)
-    : `<section class="card">
-         <h2>${esc(s.hereTitle)}</h2>
-         <button class="primary" data-locate="1">${esc(s.setLocation)}</button>
-         <div class="picker">
-           <input id="here-search" type="search" placeholder="${esc(s.pickStation)}" autocomplete="off">
-           <ul id="here-results"></ul>
-         </div>
-       </section>`
+  const quakeLine = e
+    ? `<p class="quake${config.eventId === e.id ? ' past' : ''}">
+         ${e.magnitude ? `${esc(s.magnitude(e.magnitude))} · ` : ''}${esc(e.hypocenter.name)} · ${esc(jstTime(e.occurredAt, lang))}
+         ${config.eventId === e.id ? `<span class="past-note">${esc(s.pastEvent(jstFull(new Date(e.occurredAt), lang)))}</span>` : ''}
+       </p>`
+    : ''
 
-  return `<section class="quake${past ? ' past' : ''}">
-      <p>${esc(s.quakeAt(e.hypocenter.name, jstTime(e.occurredAt, lang)))}${e.magnitude ? ` · ${esc(s.magnitude(e.magnitude))}` : ''}</p>
-      ${past ? `<p class="past-note">${esc(s.pastEvent(jstFull(new Date(e.occurredAt), lang)))}</p>` : ''}
-    </section>
-    ${here}
-    ${config.home ? placeCard('home', s.homeTitle, config.home, {}, lang) : ''}
-    ${flightCard(lang)}
-    <section class="card what">
-      <h2>${esc(s.whatNow)}</h2>
-      <p class="detail">${esc(whatNow(lang))}</p>
-    </section>`
+  return `${verdictBlock(lang)}
+    ${quakeLine}
+    <ul class="places">${places(lang).map((p) => placeRow(p, lang)).join('')}</ul>`
 }
 
 function render() {
@@ -376,23 +488,23 @@ function render() {
     : ''
 
   $('app').innerHTML = testBanner + `
-    <header>
+    <header class="top">
       <div class="brand">
         <h1>${esc(s.appName)}</h1>
         <p>${esc(s.tagline)}</p>
       </div>
       <div class="controls">
-        <button class="lang" data-lang="${lang === 'en' ? 'ja' : 'en'}">${lang === 'en' ? '日本語' : 'English'}</button>
+        <button class="lang" data-lang="${lang === 'en' ? 'ja' : 'en'}">${lang === 'en' ? '日本語' : 'EN'}</button>
         <button class="link" data-settings="1">${esc(s.settings)}</button>
       </div>
     </header>
+    ${body(lang)}
+    ${state.settingsOpen && data ? settingsPanel(lang) : ''}
     <p class="stamp">
       ${state.fetchedAt ? `${esc(s.lastChecked)} ${esc(jstFull(state.fetchedAt, lang))} JST` : esc(s.checking)}
       ${state.stale ? `<span class="warn">${esc(s.offline)}</span>` : ''}
       <button class="link" data-refresh="1">${esc(s.reload)}</button>
     </p>
-    ${body(lang)}
-    ${state.settingsOpen && data ? settingsPanel(lang) : ''}
     <section class="caveat">
       <h2>${esc(s.caveatTitle)}</h2>
       <p>${esc(s.caveat)}</p>

@@ -9,8 +9,8 @@ export const LANGS = /** @type {Lang[]} */ (['en', 'ja'])
 
 const STRINGS = {
   en: {
-    appName: 'Can I Get Back?',
-    tagline: 'Trains after an earthquake, in plain terms.',
+    appName: 'Move or Wait',
+    tagline: 'Trains in Japan after an earthquake',
     langName: 'English',
 
     checking: 'Checking…',
@@ -49,8 +49,31 @@ const STRINGS = {
     adviceWait: 'Likely stopped for track inspection',
     adviceAvoid: 'Do not count on trains',
 
-    expectWait: (range) => `Expect ${range} before service resumes`,
-    expectDelay: 'Expect around 30 minutes of delay',
+    // 判定帯の見出し。2 秒で読める長さに切る。断定はしない。
+    statusNormal: 'RUNNING NORMALLY',
+    statusDelay: 'LIKELY DELAYED',
+    statusWait: 'LIKELY STOPPED',
+    statusAvoid: 'LIKELY OUT OF SERVICE',
+
+    // 見出しの下、なぜそうなのかを 1 行で。
+    leadNormal: 'No recent earthquake strong enough to stop trains.',
+    leadDelay: 'Trains are moving slowly while crews check the line.',
+    leadWait: 'Railways are inspecting the track before restarting.',
+    leadAvoid: 'Damage is likely. Services can be out for days.',
+
+    // 場所の行につける短い印。
+    chipNormal: 'Running',
+    chipDelay: 'Delayed',
+    chipWait: 'Stopped',
+    chipAvoid: 'No trains',
+    chipUnknown: 'No reading',
+
+    noPlaces: 'Tell us where you are to see whether your trains are running.',
+    tapToSet: 'Tap to set',
+    notSet: 'Not set',
+
+    expectWait: (range) => `Service back in ${range}`,
+    expectDelay: 'Around 30 minutes of delay',
     noEstimate: 'No estimate — damage is likely, this can take days',
     inspectionPassed: 'The estimated inspection time has passed. Check with the operator.',
     pastEvent: (when) => `Showing a past earthquake (${when} JST), not the current situation.`,
@@ -86,8 +109,8 @@ const STRINGS = {
   },
 
   ja: {
-    appName: '帰れますか',
-    tagline: '地震のあと、電車が動くかを平たく。',
+    appName: '動くか、待つか',
+    tagline: '地震のあと、日本の電車は動くか',
     langName: '日本語',
 
     checking: '確認中…',
@@ -125,6 +148,29 @@ const STRINGS = {
     adviceDelay: '動いているが遅れる',
     adviceWait: '点検のため止まっている見込み',
     adviceAvoid: '鉄道は当てにしない',
+
+    // 判定帯の見出し。2 秒で読める長さに切る。断定はしない。
+    statusNormal: '平常どおり',
+    statusDelay: '遅れている見込み',
+    statusWait: '止まっている見込み',
+    statusAvoid: '鉄道は使えない見込み',
+
+    // 見出しの下、なぜそうなのかを 1 行で。
+    leadNormal: '電車を止めるほどの地震は起きていません。',
+    leadDelay: '線路を確認しながら、徐行で動いています。',
+    leadWait: '再開の前に、鉄道会社が線路を点検しています。',
+    leadAvoid: '被害が出ている可能性。復旧に日単位かかることがあります。',
+
+    // 場所の行につける短い印。
+    chipNormal: '平常',
+    chipDelay: '遅れ',
+    chipWait: '停止',
+    chipAvoid: '不通',
+    chipUnknown: '不明',
+
+    noPlaces: 'いる場所を教えてください。その周りの電車が動くかを出します。',
+    tapToSet: 'タップして設定',
+    notSet: '未設定',
 
     expectWait: (range) => `再開まで ${range} の見込み`,
     expectDelay: '30分ほどの遅れ',
