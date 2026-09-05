@@ -8,10 +8,12 @@ import { loadRailData } from '../rail/lines.js'
 import { assignToLines } from '../rail/assign.js'
 import { composeSystems, loadLineMap } from '../rail/systems.js'
 import { dataUrl } from '../data-url.js'
-import { formatDuration, t } from './i18n.js'
+import { formatDuration, LANGS, locale, t } from './i18n.js'
 import { readConfig, writeConfig } from './config.js'
 import { buildLookup, situationAt } from './situation.js'
 import { buildScenarioEvent, loadScenarios } from './scenario.js'
+import { mapFrame, paintMaps } from './map.js'
+import { sheltersNear } from './shelters.js'
 
 /** これより前の地震は、いま動くかどうかの判断には効かない。 */
 const RELEVANT_HOURS = 12
@@ -37,7 +39,8 @@ const state = {
   error: null,
   /** @type {Set<string>} */
   showLines: new Set(),
-  settingsOpen: false,
+  /** 避難場所は開いたときに取りに行く。取れたら覚えておく。 */
+  shelters: /** @type {{key: string, list: any[]|null}} */ ({ key: '', list: null }),
 }
 let data = null
 let analysis = null
@@ -141,6 +144,25 @@ function analyse(event) {
   }
 }
 
+/**
+ * 現在地に名前をつける。緯度経度だけ出されても、そこがどこか分からない。
+ * 最寄り駅の名前を借りる。2km 以内に駅が無ければ座標を出す。
+ */
+function nameForCoords(lat, lon, lang) {
+  const s = t(lang)
+  if (!data?.places) return s.coordsOnly(lat.toFixed(3), lon.toFixed(3))
+
+  let best = null
+  for (const st of data.places.stations) {
+    // 粗く絞ってから距離を測る。全駅に haversine をかける必要はない。
+    if (Math.abs(st.lat - lat) > 0.05 || Math.abs(st.lon - lon) > 0.05) continue
+    const d = (st.lat - lat) ** 2 + (st.lon - lon) ** 2
+    if (!best || d < best.d) best = { d, st }
+  }
+  if (!best) return s.coordsOnly(lat.toFixed(3), lon.toFixed(3))
+  return s.nearStation(lang === 'ja' || lang === 'zh' || lang === 'ko' ? best.st.ja : best.st.en)
+}
+
 const situation = (place, hint) =>
   situationAt(
     place,
@@ -152,8 +174,6 @@ const situation = (place, hint) =>
   )
 
 // ── 表示 ──────────────────────────────────────────────────
-
-const locale = (lang) => (lang === 'ja' ? 'ja-JP' : 'en-GB')
 
 const jstTime = (iso, lang) =>
   new Intl.DateTimeFormat(locale(lang), {
@@ -326,57 +346,111 @@ function lineList(sit, lang) {
     .join('')
 }
 
-/** 未設定の場所を、その場で設定できる欄。 */
-function setupPanel(entry, lang) {
-  const s = t(lang)
-  if (entry.id === 'here') {
-    return `<div class="panel">
-      <button class="primary" data-locate="1">${esc(s.setLocation)}</button>
-      <div class="picker">
-        <input id="here-search" type="search" placeholder="${esc(s.pickStation)}" autocomplete="off">
-        <ul id="here-results"></ul>
-      </div>
-    </div>`
-  }
-  if (entry.id === 'home') {
-    return `<div class="panel">
-      <p class="hint">${esc(s.homeHelp)}</p>
-      <div class="picker">
-        <input id="home-search" type="search" placeholder="${esc(s.searchHome)}" autocomplete="off">
-        <ul id="home-results"></ul>
-      </div>
-    </div>`
-  }
-  return `<div class="panel">
-    <p class="hint">${esc(s.chooseAirport)}</p>
-    <button class="primary" data-settings="1">${esc(s.settings)}</button>
+/**
+ * 駅を選ぶ欄。遅延レーダーと同じ作りにしてある。
+ * 候補は読む結果ではなく選ぶメニューなので、カードを並べず、
+ * 欄の真下に 1 枚の面を浮かせて罫線で区切る。
+ */
+function picker(inputId, listId, placeholder) {
+  return `<div class="hitwrap">
+    <input id="${esc(inputId)}" type="search" placeholder="${esc(placeholder)}" autocomplete="off"
+      autocapitalize="off" spellcheck="false">
+    <div class="hits" id="${esc(listId)}"></div>
   </div>`
+}
+
+/**
+ * 行を開いたときの中身。
+ *
+ * その場所の設定と内訳を、同じところに置く。
+ * 設定だけ別画面に飛ばすと「タップして設定 → さらに設定を押す」になり、
+ * しかも関係のない項目まで一緒に出てしまう。
+ */
+function rowPanel(entry, lang) {
+  const s = t(lang)
+  const parts = []
+
+  if (entry.id === 'here') {
+    parts.push(`<div class="rowacts">
+      <button class="pill" data-locate="1">${esc(entry.place ? s.recheckLocation : s.setLocation)}</button>
+    </div>`)
+    parts.push(picker('here-search', 'here-results', s.pickStation))
+  } else if (entry.id === 'home') {
+    parts.push(`<p class="hint">${esc(s.homeHelp)}</p>`)
+    parts.push(picker('home-search', 'home-results', s.searchHome))
+    if (entry.place) {
+      parts.push(`<div class="rowacts"><button class="pill" data-clearhome="1">${esc(s.clear)}</button></div>`)
+    }
+  } else if (entry.id === 'flight') {
+    const options = data.places.airports
+      .map(
+        (a) =>
+          `<option value="${esc(a.iata)}"${config.flightAirport === a.iata ? ' selected' : ''}>${esc(airportName(a, lang))} (${esc(a.iata)})</option>`,
+      )
+      .join('')
+    parts.push(`<div class="field">
+        <label for="airport">${esc(s.chooseAirport)}</label>
+        <select id="airport"><option value="">—</option>${options}</select>
+      </div>
+      <div class="field">
+        <label for="dep">${esc(s.departureTime)}</label>
+        <input id="dep" type="datetime-local" value="${esc(config.flightDeparture ?? '')}">
+      </div>
+      <div class="rowacts">
+        <button class="pill primary" data-savefl="1">${esc(s.save)}</button>
+        ${config.flightAirport ? `<button class="pill" data-clearfl="1">${esc(s.clear)}</button>` : ''}
+      </div>`)
+  }
+
+  if (entry.place && analysis.event) {
+    const sit = situation(entry.place, entry.hint)
+    parts.push(
+      sit.lines.length
+        ? `<ul class="lines">${lineList(sit, lang)}</ul>`
+        : `<p class="hint">${esc(s.unknownHere)}</p>`,
+    )
+  }
+
+  return `<div class="panel">${parts.join('')}</div>`
+}
+
+const airportName = (a, lang) => (lang === 'ja' ? a.ja : a.en)
+
+/** 現在地は座標で持つ。表示名は言語が変われば変わるので、その都度作る。 */
+function placeName(place, lang) {
+  if (!place) return ''
+  if (place.geo) return nameForCoords(place.lat, place.lon, lang)
+  if (lang === 'en' && place.en) return place.en
+  return place.name || place.en || '—'
 }
 
 function placeRow(entry, lang) {
   const s = t(lang)
   const open = state.showLines.has(entry.id)
+  const chevron = `<span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>`
 
   if (!entry.place) {
-    return `<li class="place">
+    return `<li class="place${open ? ' open' : ''}">
       <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
         <span class="p-label">${esc(entry.label)}</span>
         <span class="p-name muted">${esc(s.tapToSet)}</span>
         <span class="chip c-unset">${esc(s.notSet)}</span>
+        ${chevron}
       </button>
-      ${open ? setupPanel(entry, lang) : ''}
+      ${open ? rowPanel(entry, lang) : ''}
     </li>`
   }
 
   // 対象の地震が無いときは場所ごとの計算そのものが無い (震度の場が作られない)。
-  // 設定した場所は名前だけ出す。
   if (!analysis.event) {
-    return `<li class="place">
-      <div class="prow">
+    return `<li class="place${open ? ' open' : ''}">
+      <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
         <span class="p-label">${esc(entry.label)}</span>
-        <span class="p-name">${esc(entry.place.name || '—')}</span>
+        <span class="p-name">${esc(placeName(entry.place, lang))}</span>
         <span class="chip c-normal">${esc(s.chipNormal)}</span>
-      </div>
+        ${chevron}
+      </button>
+      ${open ? rowPanel(entry, lang) : ''}
     </li>`
   }
 
@@ -406,53 +480,154 @@ function placeRow(entry, lang) {
     }
   }
 
-  return `<li class="place">
+  return `<li class="place${open ? ' open' : ''}">
     <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
       <span class="p-label">${esc(entry.label)}</span>
-      <span class="p-name">${esc(entry.place.name || '—')}</span>
+      <span class="p-name">${esc(placeName(entry.place, lang))}</span>
       <span class="chip c-${unknown ? 'unset' : advice}">${esc(chip)}</span>
+      ${chevron}
     </button>
     ${extra}
-    ${open && sit.lines.length
-      ? `<ul class="lines">${lineList(sit, lang)}</ul>`
-      : open
-        ? `<div class="panel"><p class="hint">${esc(s.unknownHere)}</p></div>`
-        : ''}
+    ${open ? rowPanel(entry, lang) : ''}
   </li>`
 }
 
-function settingsPanel(lang) {
+/**
+ * 設定はダイアログ。中身は画面全体にかかるものだけに絞る。
+ * 場所ごとの設定はその場所の行の中にある。
+ */
+/** 判断の材料になる場所。現在地が無ければ宿で代用する。 */
+const anchor = () => state.here ?? config.home ?? null
+
+/**
+ * 震源の地図。補足情報なので既定では畳んでおく。
+ * 自分のいる場所も一緒に描く。震源だけ出されても、遠いのか近いのか分からない。
+ */
+function quakeMap(lang) {
   const s = t(lang)
-  const options = data.places.airports
+  const e = analysis.event
+  if (!e || e.hypocenter.lat == null || e.hypocenter.lon == null) return ''
+
+  const open = state.showLines.has('quakemap')
+  const label = open ? s.hideMap : s.showMap
+  if (!open) return `<button class="link mapbtn" data-toggle="quakemap">${esc(label)}</button>`
+
+  const me = anchor()
+  const epi = { lat: e.hypocenter.lat, lon: e.hypocenter.lon }
+  const markers = [{ ...epi, kind: 'quake', label: esc(s.epicentre) }]
+  if (me) markers.push({ lat: me.lat, lon: me.lon, kind: 'me', label: esc(s.youAreHere) })
+
+  return `<button class="link mapbtn" data-toggle="quakemap">${esc(label)}</button>
+    ${mapFrame({
+      center: epi,
+      // 震源と自分が両方入る縮尺にする。震源だけ出されても遠近が分からない。
+      fit: me ? [epi, me] : null,
+      zoom: 8,
+      markers,
+      note: esc(s.shelterMapNote),
+    })}`
+}
+
+/**
+ * 近くの避難場所。
+ *
+ * 電車が動かないと分かった人が次に要るのは、どこへ行けばよいかの当て。
+ * 地震で使える場所だけを出す。洪水専用の高台を地震のときに案内しない。
+ */
+function shelterSection(lang) {
+  const s = t(lang)
+  const me = anchor()
+  const open = state.showLines.has('shelter')
+
+  const head = `<button class="prow" data-toggle="shelter" aria-expanded="${open}">
+    <span class="p-label">${esc(s.shelterTitle)}</span>
+    <span class="p-name${me ? '' : ' muted'}">${esc(me ? placeName(me, lang) : s.tapToSet)}</span>
+    <span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>
+  </button>`
+
+  if (!open) return `<li class="place">${head}</li>`
+
+  if (!me) {
+    return `<li class="place open">${head}
+      <div class="panel"><p class="hint">${esc(s.noPlaces)}</p></div>
+    </li>`
+  }
+
+  const key = `${me.lat.toFixed(3)},${me.lon.toFixed(3)}`
+  if (state.shelters.key !== key) {
+    // 開いたときに取りに行く。取れたら描き直す。
+    state.shelters = { key, list: null }
+    sheltersNear(me).then((list) => {
+      if (state.shelters.key !== key) return
+      state.shelters = { key, list }
+      render()
+    })
+  }
+
+  const list = state.shelters.list
+  if (!list) {
+    return `<li class="place open">${head}
+      <div class="panel"><p class="hint">${esc(s.shelterLoading)}</p></div>
+    </li>`
+  }
+  if (list.length === 0) {
+    return `<li class="place open">${head}
+      <div class="panel"><p class="hint">${esc(s.shelterNone)}</p></div>
+    </li>`
+  }
+
+  const markers = [
+    { lat: me.lat, lon: me.lon, kind: 'me', label: esc(s.youAreHere) },
+    ...list.map((x, i) => ({ lat: x.lat, lon: x.lon, kind: 'shelter', label: String(i + 1) })),
+  ]
+
+  const rows = list
     .map(
-      (a) =>
-        `<option value="${esc(a.iata)}"${config.flightAirport === a.iata ? ' selected' : ''}>${esc(lang === 'en' ? a.en : a.ja)} (${esc(a.iata)})</option>`,
+      (x, i) => `<li>
+        <span class="sh-no">${i + 1}</span>
+        <span class="sh-body">
+          <span class="sh-name">${esc(x.name)}</span>
+          <span class="sh-sub">${esc(x.address)} · ${esc(s.shelterDistance(x.distanceKm.toFixed(1)))}</span>
+        </span>
+        <a class="sh-go" target="_blank" rel="noopener"
+           href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lon}">${esc(s.openInMaps)}</a>
+      </li>`,
     )
     .join('')
 
-  return `<section class="settings">
-    <h2>${esc(s.settings)}</h2>
-    <label>${esc(s.homeTitle)}</label>
-    <p class="value">${config.home ? esc(config.home.name || `${config.home.lat}, ${config.home.lon}`) : esc(s.noHome)}</p>
-    <p class="hint">${esc(s.homeHelp)}</p>
-    <div class="picker">
-      <input id="home-search" type="search" placeholder="${esc(s.searchHome)}" autocomplete="off">
-      <ul id="home-results"></ul>
+  return `<li class="place open">${head}
+    <div class="panel">
+      <p class="hint">${esc(s.shelterHelp)}</p>
+      ${mapFrame({
+        center: me,
+        fit: [me, ...list.map((x) => ({ lat: x.lat, lon: x.lon }))],
+        markers,
+        note: esc(s.shelterMapNote),
+      })}
+      <ul class="shelters">${rows}</ul>
     </div>
-    <div class="row">
-      ${state.here ? `<button class="link" data-sethome="1">${esc(s.setHome)}</button>` : ''}
-      ${config.home ? `<button class="link" data-clearhome="1">${esc(s.clear)}</button>` : ''}
+  </li>`
+}
+
+function settingsDialog(lang) {
+  const s = t(lang)
+  const langs = LANGS.map(
+    (l) =>
+      `<button class="pill${l.code === lang ? ' on' : ''}" data-lang="${esc(l.code)}">${esc(l.label)}</button>`,
+  ).join('')
+
+  return `<dialog id="settings">
+    <form method="dialog" class="dlg-head">
+      <h2>${esc(s.settings)}</h2>
+      <button class="x" aria-label="${esc(s.close)}">&times;</button>
+    </form>
+    <div class="dlg-body">
+      <label>${esc(s.language)}</label>
+      <div class="rowacts">${langs}</div>
+      <label>${esc(s.shareLabel)}</label>
+      <div class="rowacts"><button class="pill" data-share="1">${esc(s.share)}</button></div>
     </div>
-    <label for="airport">${esc(s.chooseAirport)}</label>
-    <select id="airport"><option value="">—</option>${options}</select>
-    <label for="dep">${esc(s.departureTime)}</label>
-    <input id="dep" type="datetime-local" value="${esc(config.flightDeparture ?? '')}">
-    <div class="row">
-      <button class="primary" data-savefl="1">${esc(s.save)}</button>
-      <button class="link" data-share="1">${esc(s.share)}</button>
-      <button class="link" data-settings="0">${esc(s.close)}</button>
-    </div>
-  </section>`
+  </dialog>`
 }
 
 function body(lang) {
@@ -470,7 +645,11 @@ function body(lang) {
 
   return `${verdictBlock(lang)}
     ${quakeLine}
-    <ul class="places">${places(lang).map((p) => placeRow(p, lang)).join('')}</ul>`
+    ${e ? quakeMap(lang) : ''}
+    <ul class="places">
+      ${places(lang).map((p) => placeRow(p, lang)).join('')}
+      ${shelterSection(lang)}
+    </ul>`
 }
 
 function render() {
@@ -494,17 +673,17 @@ function render() {
         <p>${esc(s.tagline)}</p>
       </div>
       <div class="controls">
-        <button class="lang" data-lang="${lang === 'en' ? 'ja' : 'en'}">${lang === 'en' ? '日本語' : 'EN'}</button>
-        <button class="link" data-settings="1">${esc(s.settings)}</button>
+        <button class="lang" data-opensettings="1" aria-label="${esc(s.language)}">${esc(LANGS.find((l) => l.code === lang)?.label ?? lang)}</button>
+        <button class="link" data-opensettings="1">${esc(s.settings)}</button>
       </div>
     </header>
     ${body(lang)}
-    ${state.settingsOpen && data ? settingsPanel(lang) : ''}
     <p class="stamp">
       ${state.fetchedAt ? `${esc(s.lastChecked)} ${esc(jstFull(state.fetchedAt, lang))} JST` : esc(s.checking)}
       ${state.stale ? `<span class="warn">${esc(s.offline)}</span>` : ''}
       <button class="link" data-refresh="1">${esc(s.reload)}</button>
     </p>
+    ${data ? settingsDialog(lang) : ''}
     <section class="caveat">
       <h2>${esc(s.caveatTitle)}</h2>
       <p>${esc(s.caveat)}</p>
@@ -512,35 +691,38 @@ function render() {
       <p class="src"><a href="test.html">test</a> · <a href="diagnostics.html">diagnostics</a></p>
     </section>`
   wire()
+  // 幅が決まってからでないとタイルの位置が出せない。
+  paintMaps($('app'))
 }
 
 // ── 操作 ──────────────────────────────────────────────────
 
 function wire() {
-  for (const el of document.querySelectorAll('[data-toggle]')) {
-    el.onclick = () => {
-      const id = el.dataset.toggle
-      if (state.showLines.has(id)) state.showLines.delete(id)
-      else state.showLines.add(id)
-      render()
-    }
+  const all = (sel, fn) => {
+    for (const el of document.querySelectorAll(sel)) el.onclick = fn
   }
-  for (const el of document.querySelectorAll('[data-settings]')) {
-    el.onclick = () => {
-      state.settingsOpen = el.dataset.settings === '1'
-      render()
-    }
-  }
-
   const on = (sel, fn) => {
     const el = document.querySelector(sel)
     if (el) el.onclick = fn
   }
-  on('[data-lang]', (ev) => {
-    config.lang = ev.currentTarget.dataset.lang
-    writeConfig(config)
+
+  all('[data-toggle]', (ev) => {
+    const id = ev.currentTarget.dataset.toggle
+    if (state.showLines.has(id)) state.showLines.delete(id)
+    else state.showLines.add(id)
     render()
   })
+
+  // 設定はダイアログ。開いても画面の内容は消えない。
+  all('[data-opensettings]', () => $('settings')?.showModal())
+  all('[data-lang]', (ev) => {
+    config.lang = ev.currentTarget.dataset.lang
+    writeConfig(config)
+    const wasOpen = $('settings')?.open
+    render()
+    if (wasOpen) $('settings')?.showModal()
+  })
+
   on('[data-refresh]', refresh)
   on('[data-exittest]', () => {
     config.scenarioId = null
@@ -548,11 +730,6 @@ function wire() {
     refresh()
   })
   on('[data-locate]', locate)
-  on('[data-sethome]', () => {
-    config.home = { ...state.here }
-    writeConfig(config)
-    render()
-  })
   on('[data-clearhome]', () => {
     config.home = null
     writeConfig(config)
@@ -562,7 +739,12 @@ function wire() {
     config.flightAirport = $('airport').value || null
     config.flightDeparture = $('dep').value || null
     writeConfig(config)
-    state.settingsOpen = false
+    render()
+  })
+  on('[data-clearfl]', () => {
+    config.flightAirport = null
+    config.flightDeparture = null
+    writeConfig(config)
     render()
   })
   on('[data-share]', async (ev) => {
@@ -590,32 +772,58 @@ function wire() {
 
 function wireSearch(inputId, listId, onPick) {
   const input = $(inputId)
-  if (input) input.oninput = () => renderResults(input.value, listId, onPick)
+  if (!input) return
+  input.oninput = () => renderResults(input, listId, onPick)
+  // 外を触ったら候補を畳む。開きっぱなしだと下の内容を覆い続ける。
+  input.onblur = () => setTimeout(() => closeHits(input, listId), 150)
 }
 
-function renderResults(query, listId, onPick) {
+function closeHits(input, listId) {
   const list = $(listId)
   if (!list) return
-  const trimmed = query.trim()
-  if (trimmed.length < 2) {
-    list.innerHTML = ''
-    return
-  }
+  list.innerHTML = ''
+  input.classList.remove('hasHits')
+}
+
+function renderResults(input, listId, onPick) {
+  const list = $(listId)
+  if (!list) return
+  const trimmed = input.value.trim()
+  if (trimmed.length < 1) return closeHits(input, listId)
+
   const q = trimmed.toLowerCase()
   const hits = data.places.stations
     .filter((s) => s.en.toLowerCase().includes(q) || s.ja.includes(trimmed))
-    .slice(0, 8)
+    .slice(0, 12)
 
+  if (hits.length === 0) {
+    list.innerHTML = `<p class="hit-empty">${esc(t(config.lang).noResults)}</p>`
+    input.classList.add('hasHits')
+    return
+  }
+
+  // 読む結果ではなく選ぶメニュー。1 枚の面に罫線で区切って並べる。
   list.innerHTML = hits
     .map(
       (s) =>
-        `<li><button data-lat="${s.lat}" data-lon="${s.lon}" data-name="${esc(config.lang === 'en' ? s.en : s.ja)}">${esc(s.en)} · ${esc(s.ja)}</button></li>`,
+        `<button class="hit" data-lat="${s.lat}" data-lon="${s.lon}">
+          <span class="hit-main">${esc(config.lang === 'en' ? s.en : s.ja)}</span>
+          <span class="hit-sub">${esc(config.lang === 'en' ? s.ja : s.en)}</span>
+        </button>`,
     )
     .join('')
+  input.classList.add('hasHits')
 
-  for (const b of list.querySelectorAll('button')) {
-    b.onclick = () =>
-      onPick({ lat: Number(b.dataset.lat), lon: Number(b.dataset.lon), name: b.dataset.name })
+  for (const b of list.querySelectorAll('button.hit')) {
+    // blur より先に拾う。指を離す前に決まっていないと、畳まれてから click が来る。
+    b.onmousedown = (ev) => ev.preventDefault()
+    b.onclick = () => {
+      const st = data.places.stations.find(
+        (x) => x.lat === Number(b.dataset.lat) && x.lon === Number(b.dataset.lon),
+      )
+      closeHits(input, listId)
+      onPick({ lat: Number(b.dataset.lat), lon: Number(b.dataset.lon), name: st ? st.ja : '' , en: st ? st.en : '' })
+    }
   }
 }
 
@@ -629,14 +837,16 @@ function locate() {
   if (btn) btn.textContent = s.locating
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      state.here = { lat: pos.coords.latitude, lon: pos.coords.longitude, name: '' }
+      // 座標のまま持つ。表示名は言語によって変わるので描画のたびに作る。
+      state.here = { lat: pos.coords.latitude, lon: pos.coords.longitude, geo: true }
       saveHere()
       render()
     },
     () => {
       if (btn) btn.textContent = s.locationDenied
     },
-    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    // 取り直しなので、前回の位置を使い回さない。
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
   )
 }
 

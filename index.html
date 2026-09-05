@@ -121,7 +121,7 @@
       .place { border-bottom: 1px solid var(--line); }
       .prow {
         width: 100%; display: grid;
-        grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+        grid-template-columns: 1fr auto auto; grid-template-rows: auto auto;
         gap: .1rem .75rem; align-items: center;
         background: none; border: 0; color: inherit;
         padding: .8rem .15rem; text-align: left;
@@ -134,6 +134,10 @@
       .p-name { grid-column: 1; grid-row: 2; font-size: 1rem; font-weight: 600; }
       .p-name.muted { color: var(--muted); font-weight: 400; }
       .prow .chip { grid-column: 2; grid-row: 1 / span 2; }
+      .chev {
+        grid-column: 3; grid-row: 1 / span 2;
+        color: var(--muted); font-size: 1.1rem; width: 1rem; text-align: center;
+      }
       .p-extra { margin: -.3rem .15rem .7rem; font-size: .82rem; color: var(--muted); }
 
       .chip {
@@ -155,35 +159,131 @@
 
       .panel { padding: .2rem .15rem 1rem; }
       .panel .hint, .settings .hint { margin: 0 0 .6rem; font-size: .82rem; color: var(--muted); }
-      .picker { margin-top: .6rem; }
-      .picker input, .settings input, .settings select {
+      .rowacts { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; }
+      .field { margin-bottom: .7rem; }
+      .field label {
+        display: block; margin-bottom: .25rem;
+        font-size: .7rem; letter-spacing: .06em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600;
+      }
+      .field select, .field input {
+        width: 100%; font: inherit; padding: .55rem .7rem;
+        border: 1px solid var(--line); border-radius: .5rem;
+        background: var(--bg); color: var(--fg);
+      }
+
+      /* 小さな操作ボタン。行の中に置くので、主役にならない大きさにする。 */
+      .pill {
+        background: none; border: 1px solid var(--line); color: var(--fg);
+        padding: .4rem .8rem; border-radius: 999px; font-size: .82rem;
+      }
+      .pill.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+      .pill.on { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+
+      /* ── 駅の候補 ──────────────────────────────────────────
+         読む結果ではなく、選ぶメニュー。カードを並べるとひとつずつが
+         判定と同じ重さになり、下の内容を押し出してしまう。
+         1 枚の面を欄の真下に浮かせ、罫線で区切る。 */
+      .hitwrap { position: relative; }
+      .hitwrap input {
         width: 100%; font: inherit; padding: .6rem .7rem;
         border: 1px solid var(--line); border-radius: .5rem;
         background: var(--bg); color: var(--fg);
       }
-      #here-results, #home-results { list-style: none; margin: .4rem 0 0; padding: 0; }
-      #here-results li, #home-results li { border-top: 1px solid var(--line); }
-      #here-results button, #home-results button {
-        width: 100%; text-align: left; background: none; border: 0;
-        color: var(--fg); padding: .55rem 0; font-size: .9rem;
+      .hitwrap input.hasHits { border-radius: .5rem .5rem 0 0; }
+      .hits:empty { display: none; }
+      .hits {
+        position: absolute; left: 0; right: 0; top: 100%; z-index: 15;
+        max-height: min(46vh, 320px); overflow-y: auto;
+        background: var(--bg); border: 1px solid var(--line); border-top: 0;
+        border-radius: 0 0 .5rem .5rem;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, .16);
+      }
+      button.hit {
+        display: block; width: 100%; text-align: left;
+        font: inherit; color: inherit; cursor: pointer;
+        background: none; border: 0; border-top: 1px solid var(--line);
+        padding: .5rem .7rem;
+      }
+      button.hit:first-child { border-top: 0; }
+      button.hit:hover, button.hit:focus { background: var(--panel); }
+      .hit-main { display: block; font-size: .92rem; }
+      .hit-sub { display: block; font-size: .76rem; color: var(--muted); }
+      .hit-empty { margin: 0; padding: .6rem .7rem; font-size: .85rem; color: var(--muted); }
+
+      /* ── 地図 ──
+         地理院タイルを並べただけ。動かせない代わりに、圏外でも消えない
+         (タイルは出ないが、下の一覧と距離は残る)。 */
+      .mapbtn { display: inline-block; margin: -.5rem 0 .9rem; }
+      .map {
+        position: relative; overflow: hidden;
+        border: 1px solid var(--line); border-radius: .6rem;
+        background: var(--panel); margin: 0 0 .7rem;
+      }
+      .map-inner { position: absolute; inset: 0; }
+      .map img { position: absolute; width: 256px; height: 256px; }
+      .map-note {
+        position: absolute; right: 0; bottom: 0; z-index: 3;
+        background: rgba(255, 255, 255, .82); color: #333;
+        font-size: .62rem; padding: .1rem .35rem; border-radius: .3rem 0 0 0;
+      }
+      .pin {
+        position: absolute; z-index: 2; transform: translate(-50%, -50%);
+        width: 1.35rem; height: 1.35rem; border-radius: 999px;
+        border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .45);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .pin b { font-size: .62rem; color: #fff; font-weight: 700; line-height: 1; }
+      .pin-quake { background: var(--c-wait); }
+      .pin-me { background: #1c5fd0; }
+      .pin-shelter { background: var(--c-normal); }
+      /* 震源と現在地は名札を横に出す。丸の中には入らない。 */
+      .pin-quake b, .pin-me b {
+        position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+        margin-top: .2rem; white-space: nowrap;
+        background: rgba(0, 0, 0, .68); padding: .05rem .3rem; border-radius: .25rem;
       }
 
-      /* ── 設定 ── */
-      .settings {
-        margin: 1rem 0; padding: 1rem;
-        background: var(--panel); border: 1px solid var(--line); border-radius: .75rem;
+      ul.shelters { list-style: none; margin: 0; padding: 0; }
+      ul.shelters li {
+        display: grid; grid-template-columns: auto 1fr auto;
+        gap: .1rem .6rem; align-items: center;
+        padding: .5rem .15rem; border-top: 1px solid var(--line);
       }
-      .settings h2 {
-        font-size: .7rem; margin: 0 0 .5rem; color: var(--muted);
-        letter-spacing: .07em; text-transform: uppercase;
+      .sh-no {
+        width: 1.35rem; height: 1.35rem; border-radius: 999px;
+        background: var(--c-normal); color: #fff;
+        font-size: .7rem; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
       }
-      .settings label {
-        display: block; margin: 1rem 0 .3rem;
-        font-size: .72rem; color: var(--muted); font-weight: 600;
-        letter-spacing: .05em; text-transform: uppercase;
+      .sh-name { display: block; font-size: .9rem; font-weight: 600; }
+      .sh-sub { display: block; font-size: .74rem; color: var(--muted); }
+      .sh-go { font-size: .78rem; white-space: nowrap; }
+
+      /* ── 設定ダイアログ ──
+         画面全体にかかる設定だけを置く。場所ごとの設定はその場所の行の中にある。 */
+      dialog#settings {
+        border: 0; border-radius: .9rem; padding: 0;
+        width: min(24rem, calc(100vw - 2rem));
+        background: var(--bg); color: var(--fg);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, .3);
       }
-      .settings .value { margin: 0 0 .3rem; font-weight: 600; }
-      .row { display: flex; flex-wrap: wrap; gap: .9rem; align-items: center; margin-top: .9rem; }
+      dialog#settings::backdrop { background: rgba(0, 0, 0, .45); }
+      .dlg-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: .9rem 1rem; border-bottom: 1px solid var(--line);
+      }
+      .dlg-head h2 { font-size: .95rem; margin: 0; }
+      .dlg-head .x {
+        background: none; border: 0; color: var(--muted);
+        font-size: 1.4rem; line-height: 1; padding: 0 .2rem; cursor: pointer;
+      }
+      .dlg-body { padding: .4rem 1rem 1.1rem; }
+      .dlg-body label {
+        display: block; margin: .9rem 0 .4rem;
+        font-size: .7rem; letter-spacing: .06em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600;
+      }
 
       /* ── 取得時刻。オフラインかどうかは必ず見える ── */
       .stamp {

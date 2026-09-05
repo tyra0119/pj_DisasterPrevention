@@ -6,7 +6,7 @@
 //
 //   ?lang=en&home=35.6812,139.7671&homeName=Tokyo&flight=NRT&dep=2026-09-06T09:40
 
-import { detectLang, LANGS } from './i18n.js'
+import { detectLang, LANG_CODES } from './i18n.js'
 
 /**
  * @typedef {object} Config
@@ -35,7 +35,7 @@ export function readConfig(search = location.search) {
   const q = new URLSearchParams(search)
 
   const langParam = q.get('lang')
-  const lang = LANGS.includes(/** @type {any} */ (langParam))
+  const lang = LANG_CODES.includes(/** @type {any} */ (langParam))
     ? /** @type {import('./i18n.js').Lang} */ (langParam)
     : detectLang()
 
