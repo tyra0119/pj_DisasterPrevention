@@ -5,7 +5,10 @@
 
 ## 作業ルール
 
-**修正したら必ず Obsidian に反映する。** vault は `vault/`。
+**修正したら必ず Obsidian に反映して、コミットして push する。**
+確認を待たずに `origin main` まで通すこと。vault は `vault/`。
+
+push は通常の push だけ。force push はしない。
 
 書き分けはこう決めてある。二重に書かない。
 
