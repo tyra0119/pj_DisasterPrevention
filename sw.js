@@ -10,12 +10,12 @@
 // ビルド工程が無いのでファイル名に版が振れない。ここを上げることが唯一の
 // キャッシュ無効化手段になる。**コードを変えたら必ず上げること。**
 // 上げ忘れると、一度アクセスした利用者に古い画面が出続ける (v1 で実際に起きた)。
-const VERSION = 'v2'
+const VERSION = 'v3'
 const SHELL = `shell-${VERSION}`
 const DATA = `data-${VERSION}`
 
 /** 画面の骨格。これが無いと何も出せない。 */
-const SHELL_FILES = ['./', 'index.html', 'diagnostics.html', 'sw.js']
+const SHELL_FILES = ['./', 'index.html', 'diagnostics.html', 'test.html', 'sw.js']
 
 /** 同梱データ。大きいので別キャッシュに置き、更新時も捨てない。 */
 const DATA_FILES = [
@@ -24,6 +24,7 @@ const DATA_FILES = [
   'data/rail-lines.json',
   'data/line-map.json',
   'data/places.json',
+  'data/scenarios.json',
 ]
 
 self.addEventListener('install', (event) => {

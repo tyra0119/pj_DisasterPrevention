@@ -54,6 +54,9 @@ const STRINGS = {
     noEstimate: 'No estimate — damage is likely, this can take days',
     inspectionPassed: 'The estimated inspection time has passed. Check with the operator.',
     pastEvent: (when) => `Showing a past earthquake (${when} JST), not the current situation.`,
+    testBanner: 'TEST DATA — this is not a real earthquake',
+    testBannerBody: 'A synthetic scenario for checking the app. Do not act on it or share it as real.',
+    exitTest: 'Leave test mode',
     unknownHere: 'No reading near this place',
 
     linesAffected: (n) => (n === 1 ? '1 line' : `${n} lines`),
@@ -128,6 +131,9 @@ const STRINGS = {
     noEstimate: '見通し不明 — 被害が出ている可能性。日単位になりうる',
     inspectionPassed: '推定した点検時間は過ぎています。運行情報を確認してください。',
     pastEvent: (when) => `過去の地震（${when} JST）を表示しています。いまの状況ではありません。`,
+    testBanner: 'テストデータ — 実際の地震ではありません',
+    testBannerBody: '動作確認用の作り物です。これを元に行動したり、本物として共有したりしないでください。',
+    exitTest: 'テスト表示をやめる',
     unknownHere: 'この場所の近くに観測がない',
 
     linesAffected: (n) => `${n} 路線`,

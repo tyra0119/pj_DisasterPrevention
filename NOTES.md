@@ -86,6 +86,7 @@ N02 は CC BY 4.0 なので、生成物を Pages に同梱して配れる。出�
 | `data/rail-lines.json` | 596 路線 / 10,154 駅 / 17,189 線形点 | 1.05MB | 289KB |
 | `data/line-map.json` | 運転系統 190 → N02 路線の対応表 | 79KB | 18KB |
 | `data/places.json` | 駅 1,479 (日英) / 空港 11 | 224KB | 42KB |
+| `data/scenarios.json` | 動作確認用の想定 5 本 (作り物) | 1.7KB | 0.6KB |
 
 合計 gzip 441KB。Service Worker で丸ごとプリキャッシュできる範囲。
 
@@ -170,6 +171,7 @@ ODPT の運行情報は運転系統単位で来る。**運転系統 1 本 ↔ N0
 
 ```
 index.html                     アプリ本体
+test.html                      動作確認 (実データ + 想定シナリオ)
 diagnostics.html               疎通確認ページ
 sw.js                          オフライン対応
 .nojekyll                      Jekyll を通さない
@@ -189,6 +191,7 @@ src/                           ブラウザが直接読む ES モジュール
   app/i18n.js                  表示文言 (英語・日本語)
   app/config.js                設定の URL クエリ入出力
   app/situation.js             場所ごとの状況の組み立て
+  app/scenario.js              動作確認用の想定から地震を組み立てる
   app/main.js                  画面
 
 scripts/                       ビルド時のみ。配信には不要 (置いてあるだけ)

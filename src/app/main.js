@@ -11,6 +11,7 @@ import { dataUrl } from '../data-url.js'
 import { formatDuration, t } from './i18n.js'
 import { readConfig, writeConfig } from './config.js'
 import { buildLookup, situationAt } from './situation.js'
+import { buildScenarioEvent, loadScenarios } from './scenario.js'
 
 /** これより前の地震は、いま動くかどうかの判断には効かない。 */
 const RELEVANT_HOURS = 12
@@ -51,7 +52,7 @@ const esc = (s) =>
 // ── データ ────────────────────────────────────────────────
 
 async function loadAll() {
-  const [index, rail, lineMap, places] = await Promise.all([
+  const [index, rail, lineMap, places, scenarios] = await Promise.all([
     loadIndex(),
     loadRailData(),
     loadLineMap(),
@@ -59,8 +60,17 @@ async function loadAll() {
       if (!r.ok) throw new Error(`places.json: ${r.status}`)
       return r.json()
     }),
+    // テスト用の想定。読めなくてもアプリは動く。
+    loadScenarios().catch(() => null),
   ])
-  return { index, rail, lineMap, places, lookup: buildLookup(rail, lineMap) }
+  return { index, rail, lineMap, places, scenarios, lookup: buildLookup(rail, lineMap) }
+}
+
+/** テスト用の作り物を表示しているか。表示中は消せないテスト表示を出す。 */
+const isTestMode = () => Boolean(config.scenarioId && currentScenario())
+
+function currentScenario() {
+  return data?.scenarios?.scenarios.find((s) => s.id === config.scenarioId) ?? null
 }
 
 /**
@@ -87,6 +97,17 @@ function pickRelevant(events) {
 
 async function refresh() {
   state.error = null
+
+  // テスト表示中は実データを取りに行かない。混ざるのが一番危ない。
+  const scenario = currentScenario()
+  if (scenario) {
+    state.fetchedAt = new Date()
+    state.stale = false
+    analysis = analyse(buildScenarioEvent(scenario, data.index, config.lang))
+    render()
+    return
+  }
+
   try {
     let events = await fetchRecent(data.index, { limit: PAGE })
     // 過去の地震を名指しされている場合だけ遡る。通常は 1 ページで足りる。
@@ -346,7 +367,15 @@ function render() {
   document.documentElement.lang = lang
   document.title = `${s.appName} — ${s.tagline}`
 
-  $('app').innerHTML = `
+  const testBanner = isTestMode()
+    ? `<div class="testbar" role="alert">
+         <strong>${esc(s.testBanner)}</strong>
+         <span>${esc(s.testBannerBody)}</span>
+         <button class="link" data-exittest="1">${esc(s.exitTest)}</button>
+       </div>`
+    : ''
+
+  $('app').innerHTML = testBanner + `
     <header>
       <div class="brand">
         <h1>${esc(s.appName)}</h1>
@@ -368,7 +397,7 @@ function render() {
       <h2>${esc(s.caveatTitle)}</h2>
       <p>${esc(s.caveat)}</p>
       <p class="src">${esc(s.sources)}: 気象庁 / P2P地震情報 / 国土数値情報（鉄道データ）CC BY 4.0 / 公共交通オープンデータセンター / 高浜・翠川 (2011) 日本地震工学会論文集 11(2)</p>
-      <p class="src"><a href="diagnostics.html">diagnostics</a></p>
+      <p class="src"><a href="test.html">test</a> · <a href="diagnostics.html">diagnostics</a></p>
     </section>`
   wire()
 }
@@ -401,6 +430,11 @@ function wire() {
     render()
   })
   on('[data-refresh]', refresh)
+  on('[data-exittest]', () => {
+    config.scenarioId = null
+    writeConfig(config)
+    refresh()
+  })
   on('[data-locate]', locate)
   on('[data-sethome]', () => {
     config.home = { ...state.here }

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="./" />
+    <title>動作確認 — テストデータ</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0; padding: 1.25rem;
+        max-width: 46rem; margin-inline: auto;
+        font: 15px/1.65 system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      }
+      h1 { font-size: 1.15rem; margin: 0 0 .25rem; }
+      .sub { opacity: .7; font-size: .85rem; margin: 0 0 1.5rem; }
+      h2 { font-size: .85rem; margin: 2rem 0 .6rem; opacity: .75; }
+      .warn {
+        background: #b3261e; color: #fff;
+        padding: .8rem 1rem; border-radius: .5rem;
+        font-size: .85rem; line-height: 1.5;
+      }
+      .warn strong { display: block; margin-bottom: .2rem; }
+      table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+      th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid
+               color-mix(in srgb, currentColor 14%, transparent); vertical-align: baseline; }
+      th { opacity: .6; font-weight: 600; font-size: .78rem; }
+      td.level { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .links a { display: inline-block; margin-right: .8rem; white-space: nowrap; }
+      .muted { opacity: .55; }
+      .wrap { overflow-x: auto; }
+      code { font-size: .85em; }
+      footer { margin-top: 2.5rem; font-size: .78rem; opacity: .6; }
+    </style>
+  </head>
+  <body>
+    <h1>動作確認 — テストデータ</h1>
+    <p class="sub">
+      実際の地震を待たずに画面と推定を確かめるためのページ。
+      アプリ本体は <a href="./">こちら</a>、データ経路の診断は
+      <a href="diagnostics.html">diagnostics</a>。
+    </p>
+
+    <div class="warn">
+      <strong>想定シナリオは作り物です</strong>
+      震央からの距離で機械的に震度を振っているだけで、地震動の予測ではありません。
+      表示中はアプリ側に赤いテスト表示が出ます。この画面のスクリーンショットを
+      本物として共有しないでください。
+    </div>
+
+    <h2>想定シナリオ（作り物）</h2>
+    <p class="sub">
+      震度6弱以上は直近の実データに無く、そこが一番判断の重い領域なので想定で確かめます。
+    </p>
+    <div class="wrap"><table id="scenarios">
+      <tr><th>震度</th><th>想定</th><th>経過</th><th>開く</th></tr>
+    </table></div>
+
+    <h2>実際に起きた地震</h2>
+    <p class="sub">
+      直近 300 件から震度4以上を拾っています。こちらは本物のデータで、
+      アプリ側には「過去の地震」と表示されます。
+    </p>
+    <div class="wrap"><table id="events">
+      <tr><th>震度</th><th>震源</th><th>発生</th><th>開く</th></tr>
+    </table></div>
+
+    <footer>
+      出典: 気象庁 / P2P地震情報 / 国土数値情報（鉄道データ）CC BY 4.0 /
+      公共交通オープンデータセンター / 高浜・翠川 (2011) 日本地震工学会論文集 11(2)
+    </footer>
+
+    <script type="module">
+      import { buildIndex } from './src/quake/stations.js'
+      import { normalize } from './src/quake/p2p.js'
+      import { SHINDO_ORDER } from './src/quake/types.js'
+      import { dataUrl } from './src/data-url.js'
+
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+      // 宿と出国便を入れておくと、3 枚のカードが全部出た状態で確かめられる。
+      const PRESET = 'home=35.6812,139.7671&homeName=' + encodeURIComponent('東京') + '&flight=NRT'
+      const links = (params) =>
+        `<a href="./?lang=ja&${params}&${PRESET}">日本語</a><a href="./?lang=en&${params}&${PRESET}">English</a>`
+
+      // --- 想定シナリオ ---
+      const file = await fetch(dataUrl('scenarios.json')).then((r) => r.json())
+      document.getElementById('scenarios').insertAdjacentHTML(
+        'beforeend',
+        file.scenarios
+          .sort((a, b) => SHINDO_ORDER[b.maxLevel] - SHINDO_ORDER[a.maxLevel])
+          .map(
+            (s) => `<tr>
+              <td class="level">${esc(s.maxLevel)}</td>
+              <td>${esc(s.title.ja)}</td>
+              <td class="muted">${s.minutesAgo}分前</td>
+              <td class="links">${links('scenario=' + encodeURIComponent(s.id))}</td>
+            </tr>`,
+          )
+          .join(''),
+      )
+
+      // --- 実際の地震 ---
+      const [stations, areas] = await Promise.all([
+        fetch(dataUrl('shindo-stations.json')).then((r) => r.json()),
+        fetch(dataUrl('shindo-areas.json')).then((r) => r.json()),
+      ])
+      const index = buildIndex(stations, areas)
+
+      const raw = []
+      for (let i = 0; i < 3; i++) {
+        const res = await fetch(
+          `https://api.p2pquake.net/v2/history?codes=551&limit=100&offset=${i * 100}`,
+        )
+        if (res.ok) raw.push(...(await res.json()))
+      }
+
+      const events = raw
+        .map((r) => normalize(r, index))
+        .filter((e) => e.resolution === 'station' && e.maxLevel)
+        .filter((e) => SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER['4'])
+        // 同じ地震で続報が複数来るので、震源と発生時刻でまとめる。
+        .filter((e, i, all) => all.findIndex((x) => x.occurredAt === e.occurredAt) === i)
+        .sort((a, b) => SHINDO_ORDER[b.maxLevel] - SHINDO_ORDER[a.maxLevel] ||
+          Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+        .slice(0, 25)
+
+      const fmt = (iso) =>
+        new Intl.DateTimeFormat('ja-JP', {
+          dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tokyo',
+        }).format(new Date(iso))
+
+      document.getElementById('events').insertAdjacentHTML(
+        'beforeend',
+        events.length
+          ? events
+              .map(
+                (e) => `<tr>
+                  <td class="level">${esc(e.maxLevel)}</td>
+                  <td>${esc(e.hypocenter.name)}${e.magnitude ? ` <span class="muted">M${e.magnitude}</span>` : ''}</td>
+                  <td class="muted">${esc(fmt(e.occurredAt))}</td>
+                  <td class="links">${links('event=' + encodeURIComponent(e.id))}</td>
+                </tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="4" class="muted">直近 300 件に震度4以上の地震がありません</td></tr>',
+      )
+    </script>
+  </body>
+</html>

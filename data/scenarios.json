@@ -1,0 +1,51 @@
+{
+  "note": "テスト用の作り物。実際の地震ではない。震度は震央からの距離で機械的に振っているだけで、地震動の予測ではない。画面と推定の動きを確かめるためだけに使う。",
+  "noteEn": "Synthetic test fixtures. Not real earthquakes. Intensities are assigned purely by distance from the epicentre; this is not a ground-motion model. For exercising the UI and the estimate only.",
+  "scenarios": [
+    {
+      "id": "tokyo-4",
+      "title": { "ja": "東京湾 M5.5 最大震度4", "en": "Tokyo Bay M5.5, max intensity 4" },
+      "hypocenter": { "ja": "東京湾", "en": "Tokyo Bay", "lat": 35.55, "lon": 139.85 },
+      "magnitude": 5.5,
+      "maxLevel": "4",
+      "falloffKm": 30,
+      "minutesAgo": 15
+    },
+    {
+      "id": "tokyo-5minus",
+      "title": { "ja": "千葉県北西部 M6.0 最大震度5弱", "en": "NW Chiba M6.0, max intensity 5-" },
+      "hypocenter": { "ja": "千葉県北西部", "en": "Northwestern Chiba", "lat": 35.72, "lon": 140.05 },
+      "magnitude": 6.0,
+      "maxLevel": "5-",
+      "falloffKm": 35,
+      "minutesAgo": 40
+    },
+    {
+      "id": "tokyo-6plus",
+      "title": { "ja": "東京湾北部 M7.3 最大震度6強", "en": "Northern Tokyo Bay M7.3, max intensity 6+" },
+      "hypocenter": { "ja": "東京湾北部", "en": "Northern Tokyo Bay", "lat": 35.62, "lon": 139.88 },
+      "magnitude": 7.3,
+      "maxLevel": "6+",
+      "falloffKm": 25,
+      "minutesAgo": 30
+    },
+    {
+      "id": "osaka-6minus",
+      "title": { "ja": "大阪府北部 M6.5 最大震度6弱", "en": "Northern Osaka M6.5, max intensity 6-" },
+      "hypocenter": { "ja": "大阪府北部", "en": "Northern Osaka", "lat": 34.84, "lon": 135.62 },
+      "magnitude": 6.5,
+      "maxLevel": "6-",
+      "falloffKm": 25,
+      "minutesAgo": 25
+    },
+    {
+      "id": "sendai-5plus",
+      "title": { "ja": "宮城県沖 M6.8 最大震度5強", "en": "Off Miyagi M6.8, max intensity 5+" },
+      "hypocenter": { "ja": "宮城県沖", "en": "Off Miyagi Prefecture", "lat": 38.3, "lon": 141.8 },
+      "magnitude": 6.8,
+      "maxLevel": "5+",
+      "falloffKm": 40,
+      "minutesAgo": 55
+    }
+  ]
+}

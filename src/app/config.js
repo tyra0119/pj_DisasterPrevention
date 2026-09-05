@@ -17,6 +17,9 @@ import { detectLang, LANGS } from './i18n.js'
  * @property {string|null} eventId
  *   過去の地震を指定して見るときの ID。指定すると 12 時間の窓を無視する。
  *   「あのときどうだったか」を人に見せるのと、画面の確認に使う。
+ * @property {string|null} scenarioId
+ *   テスト用の作り物の地震を表示するときの ID。実データが無い震度6弱以上を
+ *   確かめるのに要る。表示中は消せないテスト表示を出す。
  */
 
 const num = (v) => {
@@ -53,6 +56,7 @@ export function readConfig(search = location.search) {
     flightAirport: q.get('flight'),
     flightDeparture: q.get('dep'),
     eventId: q.get('event'),
+    scenarioId: q.get('scenario'),
   }
 }
 
@@ -70,6 +74,7 @@ export function writeConfig(config) {
   if (config.flightAirport) q.set('flight', config.flightAirport)
   if (config.flightDeparture) q.set('dep', config.flightDeparture)
   if (config.eventId) q.set('event', config.eventId)
+  if (config.scenarioId) q.set('scenario', config.scenarioId)
 
   const url = `${location.pathname}?${q}`
   history.replaceState(null, '', url)

@@ -101,6 +101,25 @@
         font-weight: 600;
       }
 
+      /* テスト表示。見落とされたら事故になるので、色も位置も譲らない。 */
+      .testbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        margin: -1rem -1rem 1rem;
+        padding: .7rem 1rem;
+        background: #b3261e;
+        color: #fff;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem .75rem;
+        align-items: baseline;
+        font-size: .8rem;
+        line-height: 1.4;
+      }
+      .testbar strong { font-size: .85rem; letter-spacing: .02em; }
+      .testbar button.link { color: #fff; }
+
       .stamp {
         display: flex;
         flex-wrap: wrap;
