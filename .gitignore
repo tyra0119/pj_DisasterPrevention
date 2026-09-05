@@ -1,5 +1,8 @@
 node_modules/
 .cache/
 
+# ODPT のトークン。絶対にコミットしない
+.env.local
+
 # Obsidian のワークスペース状態は毎回変わるので追わない
 vault/.obsidian/workspace.json
