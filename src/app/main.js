@@ -164,10 +164,15 @@ function analyse(event) {
  */
 function nameForCoords(lat, lon, lang) {
   const s = t(lang)
-  // 住所が引けているならそれを出す。駅名より正確で、人に見せられる。
-  if (state.address.key === `${lat.toFixed(4)},${lon.toFixed(4)}` && state.address.text) {
-    return state.address.text
-  }
+
+  // 住所を出す。駅名より正確で、人に見せて伝えられる。
+  //
+  // 取得はここで促す。行を開いたときに初めて引くようにしていたら、
+  // 閉じているあいだは緯度経度で、タップした瞬間に住所へ入れ替わっていた。
+  // 表示が操作で変わるのは、こちらの都合が漏れているだけ。
+  const address = addressFor({ lat, lon, geo: true })
+  if (address) return address
+
   if (!data?.places) return s.coordsOnly(lat.toFixed(3), lon.toFixed(3))
 
   let best = null
@@ -409,7 +414,6 @@ function rowPanel(entry, lang) {
   if (entry.id === 'here') {
     if (entry.place?.geo) {
       // 住所は行の見出しに出ている。ここは座標だけ。二度書くと読み飛ばされる。
-      addressFor(entry.place)
       parts.push(
         `<p class="addr"><span class="addr-sub">${esc(s.coordsOnly(entry.place.lat.toFixed(4), entry.place.lon.toFixed(4)))}</span></p>`,
       )
