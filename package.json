@@ -1,0 +1,15 @@
+{
+  "name": "disaster-prevention",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Earthquake-aware travel guidance for visitors in Japan",
+  "scripts": {
+    "data:build": "node scripts/build-shindo-data.mjs && node scripts/build-rail-data.mjs",
+    "data:shindo": "node scripts/build-shindo-data.mjs",
+    "data:rail": "node scripts/build-rail-data.mjs",
+    "verify:shindo": "node scripts/verify-spatialize.mjs",
+    "verify:rail": "node scripts/verify-rail.mjs",
+    "typecheck": "tsc"
+  }
+}

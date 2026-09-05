@@ -1,0 +1,5 @@
+node_modules/
+.cache/
+
+# Obsidian のワークスペース状態は毎回変わるので追わない
+vault/.obsidian/workspace.json
