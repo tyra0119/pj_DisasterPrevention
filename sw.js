@@ -16,7 +16,7 @@
 // ビルド工程が無いのでファイル名に版が振れない。ここを上げることが唯一の
 // キャッシュ無効化手段になる。**コードを変えたら必ず上げること。**
 // 上げ忘れると、一度アクセスした利用者に古い画面が出続ける (v1 で実際に起きた)。
-const VERSION = 'v14'
+const VERSION = 'v16'
 const SHELL = `shell-${VERSION}`
 const DATA = `data-${VERSION}`
 
@@ -31,6 +31,7 @@ const DATA_FILES = [
   'data/line-map.json',
   'data/places.json',
   'data/scenarios.json',
+  'data/temp-shelters.json',
 ]
 
 /** 取得は必ずサーバに確かめる。HTTP キャッシュの古い応答を掴まないため。 */

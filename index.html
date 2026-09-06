@@ -154,30 +154,38 @@
       .c-unset { background: none; color: var(--muted); border: 1px solid var(--line); font-weight: 600; }
 
       ul.lines { list-style: none; margin: 0 0 .8rem; padding: 0; }
-      ul.lines li {
-        display: flex; justify-content: space-between; align-items: center;
-        gap: .75rem; padding: .35rem .15rem; font-size: .87rem;
-      }
+      /* 行の下に内訳が開くので、li は縦積み。
+         横並び (flex) のままだと、行と内訳が横に並んで行が潰れ、
+         閉じるボタンが押せなくなる。 */
+      ul.lines li { display: block; }
       ul.lines li + li { border-top: 1px solid var(--line); }
       .lnrow {
         width: 100%; display: grid;
-        grid-template-columns: 1fr auto auto; gap: .75rem;
+        grid-template-columns: 1fr auto auto; gap: .1rem .7rem;
         align-items: center; text-align: left;
-        background: none; border: 0; color: inherit; padding: .45rem .15rem;
+        background: none; border: 0; color: inherit;
+        padding: .5rem .15rem; font-size: .87rem;
       }
-      .lnrow .chev { grid-row: 1; font-size: .95rem; }
-      /* 推定の内訳。数字を出す以上、どこから来た数字かを見せる。 */
-      .lndetail { padding: .1rem .15rem .7rem; }
-      .lndetail dl {
-        display: grid; grid-template-columns: max-content 1fr;
-        gap: .15rem .7rem; margin: 0 0 .5rem; font-size: .8rem;
+      .lnrow .ln { min-width: 0; }
+      .lnrow .chip { justify-self: end; }
+      .lnrow .chev {
+        grid-column: 3; grid-row: auto;
+        color: var(--muted); font-size: 1rem; width: .9rem; text-align: center;
       }
-      .lndetail dt { color: var(--muted); }
-      .lndetail dd { margin: 0; }
-      .lndetail .muted { color: var(--muted); }
-      .lndetail .hint { font-size: .76rem; margin: 0 0 .35rem; }
       /* 遠くで止まっている路線に添える場所。判定が平常なのに不通が並ぶ理由。 */
       .ln-where { display: block; font-size: .74rem; color: var(--muted); }
+
+      /* 推定の内訳。数字を出す以上、どこから来た数字かを見せる。 */
+      .lndetail { padding: 0 .15rem .7rem; }
+      .lndetail dl {
+        display: grid; grid-template-columns: max-content minmax(0, 1fr);
+        gap: .2rem .7rem; margin: 0 0 .5rem; font-size: .8rem;
+      }
+      .lndetail dt { color: var(--muted); }
+      .lndetail dd { margin: 0; overflow-wrap: anywhere; }
+      .lndetail .muted { color: var(--muted); }
+      .lndetail .src { display: block; font-size: .74rem; }
+      .lndetail .hint { font-size: .76rem; margin: 0 0 .35rem; }
 
       .panel { padding: .2rem .15rem 1rem; }
       .panel .hint, .settings .hint { margin: 0 0 .6rem; font-size: .82rem; color: var(--muted); }
@@ -263,6 +271,10 @@
       .pin-quake { background: var(--c-wait); }
       .pin-me { background: #1c5fd0; }
       .pin-shelter { background: var(--c-normal); }
+      /* 一時滞在施設は逃げ場ではなく休み場。色を分ける。 */
+      .pin-stay { background: #1a5fb4; }
+      .sh-stay { background: #1a5fb4; }
+      .sh-shelter { background: var(--c-normal); }
       /* 震源と現在地は名札を横に出す。丸の中には入らない。 */
       .pin-quake b, .pin-me b {
         position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
@@ -280,6 +292,11 @@
         display: grid; grid-template-columns: auto 1fr auto;
         gap: .1rem .6rem; align-items: center;
         padding: .5rem .15rem; border-top: 1px solid var(--line);
+      }
+      .subhead {
+        margin: 1.2rem 0 .4rem; font-size: .74rem; font-weight: 700;
+        letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+        padding-top: .8rem; border-top: 1px solid var(--line);
       }
       .sh-no {
         width: 1.35rem; height: 1.35rem; border-radius: 999px;

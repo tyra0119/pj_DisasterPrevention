@@ -15,6 +15,7 @@ import { buildScenarioEvent, loadScenarios } from './scenario.js'
 import { hypocenterName, refreshHypocenterNames } from '../quake/jma.js'
 import { mapFrame, paintMaps } from './map.js'
 import { sheltersNear } from './shelters.js'
+import { loadTempShelters, tempSheltersNear } from './temp-shelters.js'
 import { addressAt } from './address.js'
 
 /** これより前の地震は、いま動くかどうかの判断には効かない。 */
@@ -68,7 +69,7 @@ const esc = (s) =>
 // ── データ ────────────────────────────────────────────────
 
 async function loadAll() {
-  const [index, rail, lineMap, places, scenarios] = await Promise.all([
+  const [index, rail, lineMap, places, scenarios, tempShelters] = await Promise.all([
     loadIndex(),
     loadRailData(),
     loadLineMap(),
@@ -78,8 +79,10 @@ async function loadAll() {
     }),
     // テスト用の想定。読めなくてもアプリは動く。
     loadScenarios().catch(() => null),
+    // 一時滞在施設。収録は東京都のみ。読めなくてもアプリは動く。
+    loadTempShelters().catch(() => null),
   ])
-  return { index, rail, lineMap, places, scenarios, lookup: buildLookup(rail, lineMap) }
+  return { index, rail, lineMap, places, scenarios, tempShelters, lookup: buildLookup(rail, lineMap) }
 }
 
 /** テスト用の作り物を表示しているか。表示中は消せないテスト表示を出す。 */
@@ -495,7 +498,11 @@ function lineDetail(entry, lang) {
       ),
     )
     if (sus.source) {
-      rows.push(row('', `<span class="muted">${esc(s.detSource(sus.source.label, sus.source.distanceKm.toFixed(1)))}</span>`))
+      // 空の見出しを作ると grid の行が崩れる。値の続きとして同じ dd に入れる。
+      rows[rows.length - 1] = rows[rows.length - 1].replace(
+        '</dd>',
+        `<span class="muted src">${esc(s.detSource(sus.source.label, sus.source.distanceKm.toFixed(1)))}</span></dd>`,
+      )
     }
     if (sus.inspectionLengthKm) {
       rows.push(row(s.detInspect, `${sus.inspectionLengthKm} km`))
@@ -738,24 +745,61 @@ function quakeMap(lang) {
  * 電車が動かないと分かった人が次に要るのは、どこへ行けばよいかの当て。
  * 地震で使える場所だけを出す。洪水専用の高台を地震のときに案内しない。
  */
+/**
+ * 逃げ場と休み場。
+ *
+ * **一時滞在施設が主。** 電車が動かないと分かった人が次に要るのは、
+ * 座って待てる場所。指定緊急避難場所は「建物が危ないときに逃げる先」で用途が違うので、
+ * その下に別の見出しで置く。
+ */
 function shelterSection(lang) {
   const s = t(lang)
   const me = anchor()
   const open = state.showLines.has('shelter')
 
   const head = `<button class="prow" data-toggle="shelter" aria-expanded="${open}">
-    <span class="p-label">${esc(s.shelterTitle)}</span>
+    <span class="p-label">${esc(s.stayTitle)}</span>
     <span class="p-name${me ? '' : ' muted'}">${esc(me ? placeName(me, lang) : s.tapToSet)}</span>
     <span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>
   </button>`
 
   if (!open) return `<li class="place">${head}</li>`
-
   if (!me) {
     return `<li class="place open">${head}
       <div class="panel"><p class="hint">${esc(s.noPlaces)}</p></div>
     </li>`
   }
+
+  const parts = [`<p class="hint">${esc(s.stayHelp)}</p>`]
+
+  // ── 一時滞在施設 ──
+  const temp = data.tempShelters ? tempSheltersNear(data.tempShelters, me) : { covered: false, list: [] }
+  if (!temp.covered) {
+    parts.push(`<p class="hint warn-note">${esc(s.stayUncovered)}</p>`)
+  } else if (temp.list.length === 0) {
+    parts.push(`<p class="hint">${esc(s.stayNone)}</p>`)
+  } else {
+    parts.push(
+      mapFrame({
+        center: me,
+        fit: [me, ...temp.list.map((x) => ({ lat: x.lat, lon: x.lon }))],
+        markers: [
+          { lat: me.lat, lon: me.lon, kind: 'me', label: esc(s.youAreHere) },
+          ...temp.list.map((x, i) => ({ lat: x.lat, lon: x.lon, kind: 'stay', label: String(i + 1) })),
+        ],
+        note: esc(s.shelterMapNote),
+      }),
+    )
+    parts.push(`<ul class="shelters">${shelterRows(temp.list, 'stay', lang)}</ul>`)
+    parts.push(
+      `<p class="hint">${esc(s.stayCoverage((data.tempShelters.coverage ?? []).join('・')))}</p>`,
+    )
+  }
+
+  // ── 指定緊急避難場所 ──
+  parts.push(`<h3 class="subhead">${esc(s.refugeTitle)}</h3>`)
+  parts.push(`<p class="hint">${esc(s.shelterHelp)}</p>`)
+  parts.push(`<p class="hint warn-note">${esc(s.shelterStayPut)}</p>`)
 
   const key = `${me.lat.toFixed(3)},${me.lon.toFixed(3)}`
   if (state.shelters.key !== key) {
@@ -767,28 +811,24 @@ function shelterSection(lang) {
       render()
     })
   }
-
   const list = state.shelters.list
-  if (!list) {
-    return `<li class="place open">${head}
-      <div class="panel"><p class="hint">${esc(s.shelterLoading)}</p></div>
-    </li>`
-  }
-  if (list.length === 0) {
-    return `<li class="place open">${head}
-      <div class="panel"><p class="hint">${esc(s.shelterNone)}</p></div>
-    </li>`
+  if (!list) parts.push(`<p class="hint">${esc(s.shelterLoading)}</p>`)
+  else if (list.length === 0) parts.push(`<p class="hint">${esc(s.shelterNone)}</p>`)
+  else {
+    parts.push(`<ul class="shelters">${shelterRows(list, 'shelter', lang)}</ul>`)
+    parts.push(`<p class="hint">${esc(s.shelterUnverified)}</p>`)
   }
 
-  const markers = [
-    { lat: me.lat, lon: me.lon, kind: 'me', label: esc(s.youAreHere) },
-    ...list.map((x, i) => ({ lat: x.lat, lon: x.lon, kind: 'shelter', label: String(i + 1) })),
-  ]
+  return `<li class="place open">${head}<div class="panel">${parts.join('')}</div></li>`
+}
 
-  const rows = list
+/** 避難先の一覧。番号は地図の印と対応させる。 */
+function shelterRows(list, kind, lang) {
+  const s = t(lang)
+  return list
     .map(
       (x, i) => `<li>
-        <span class="sh-no">${i + 1}</span>
+        <span class="sh-no sh-${kind}">${i + 1}</span>
         <span class="sh-body">
           <span class="sh-name">${esc(x.name)}</span>
           <span class="sh-sub">${esc(x.address)} · ${esc(s.shelterDistance(x.distanceKm.toFixed(1)))}</span>
@@ -798,21 +838,6 @@ function shelterSection(lang) {
       </li>`,
     )
     .join('')
-
-  return `<li class="place open">${head}
-    <div class="panel">
-      <p class="hint">${esc(s.shelterHelp)}</p>
-      <p class="hint warn-note">${esc(s.shelterStayPut)}</p>
-      ${mapFrame({
-        center: me,
-        fit: [me, ...list.map((x) => ({ lat: x.lat, lon: x.lon }))],
-        markers,
-        note: esc(s.shelterMapNote),
-      })}
-      <ul class="shelters">${rows}</ul>
-      <p class="hint">${esc(s.shelterUnverified)}</p>
-    </div>
-  </li>`
 }
 
 function settingsDialog(lang) {
