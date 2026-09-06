@@ -300,10 +300,13 @@ const situation = (place, hint) =>
 
 // ── 表示 ──────────────────────────────────────────────────
 
+// 24 時間表記に固定する。韓国語のロケールは既定で「오전 11:40~오후 03:15」と
+// 12 時間になり、駅の時刻表や案内板 (24 時間) と見比べられなくなる。
 const jstTime = (iso, lang) =>
   new Intl.DateTimeFormat(locale(lang), {
     hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
     timeZone: 'Asia/Tokyo',
   }).format(new Date(iso))
 

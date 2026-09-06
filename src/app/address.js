@@ -35,7 +35,11 @@ export async function addressAt(lat, lon, municipalities) {
       const { results } = await res.json()
       if (!results) return null
 
-      const muni = municipalities?.[results.muniCd] ?? ''
+      // 逆ジオコーダは "04101" と 5 桁で返すが、同梱の表 (muni.js 由来) は
+      // 北海道〜宮城の先頭の 0 を落として "4101" で持っている。
+      // 両方で引く。仙台で「中央一丁目」だけになっていたのはこれ。
+      const code = String(results.muniCd ?? '')
+      const muni = municipalities?.[code] ?? municipalities?.[code.replace(/^0+/, '')] ?? ''
       const town = results.lv01Nm ?? ''
       // 海上など、どちらも取れないことがある。
       const full = `${muni}${town}`.trim()
