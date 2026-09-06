@@ -613,6 +613,13 @@ function rowPanel(entry, lang) {
 
 const airportName = (a, lang) => pick(a.ja, a.en, lang)
 
+/** 地図の操作ボタンの読み上げ名。 */
+const mapLabels = (lang) => ({
+  zoomIn: esc(t(lang).mapZoomIn),
+  zoomOut: esc(t(lang).mapZoomOut),
+  recenter: esc(t(lang).mapRecenter),
+})
+
 /** 現在地は座標で持つ。表示名は言語が変われば変わるので、その都度作る。 */
 /**
  * その座標にある駅。共有リンクは日本語名しか運ばないので、
@@ -730,12 +737,14 @@ function quakeMap(lang) {
 
   return `<button class="link mapbtn" data-toggle="quakemap">${esc(label)}</button>
     ${mapFrame({
+      id: 'quake',
       center: epi,
       // 震源と自分が両方入る縮尺にする。震源だけ出されても遠近が分からない。
       fit: me ? [epi, me] : null,
       zoom: 8,
       markers,
       note: esc(s.shelterMapNote),
+      labels: mapLabels(lang),
     })}`
 }
 
@@ -781,6 +790,7 @@ function shelterSection(lang) {
   } else {
     parts.push(
       mapFrame({
+        id: 'stay',
         center: me,
         fit: [me, ...temp.list.map((x) => ({ lat: x.lat, lon: x.lon }))],
         markers: [
@@ -788,6 +798,7 @@ function shelterSection(lang) {
           ...temp.list.map((x, i) => ({ lat: x.lat, lon: x.lon, kind: 'stay', label: String(i + 1) })),
         ],
         note: esc(s.shelterMapNote),
+        labels: mapLabels(lang),
       }),
     )
     parts.push(`<ul class="shelters">${shelterRows(temp.list, 'stay', lang)}</ul>`)

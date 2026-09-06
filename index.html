@@ -254,8 +254,27 @@
         border: 1px solid var(--line); border-radius: .6rem;
         background: var(--panel); margin: 0 0 .7rem;
       }
-      .map-inner { position: absolute; inset: 0; }
-      .map img { position: absolute; width: 256px; height: 256px; }
+      .map-inner {
+        position: absolute; inset: 0;
+        cursor: grab; touch-action: none; user-select: none;
+      }
+      .map.dragging .map-inner { cursor: grabbing; }
+      .map img { position: absolute; width: 256px; height: 256px; pointer-events: none; }
+
+      /* 操作ボタン。地図の上に重ねる。指で押せる大きさにする。 */
+      .map-ctl {
+        position: absolute; right: .4rem; top: .4rem; z-index: 4;
+        display: flex; flex-direction: column; gap: .25rem;
+      }
+      .map-ctl button {
+        width: 2rem; height: 2rem; line-height: 1;
+        font-size: 1rem; border-radius: .45rem;
+        border: 1px solid rgba(0, 0, 0, .18);
+        background: rgba(255, 255, 255, .94); color: #222;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .map-ctl button:active { background: #e9edf1; }
       .map-note {
         position: absolute; right: 0; bottom: 0; z-index: 3;
         background: rgba(255, 255, 255, .82); color: #333;
