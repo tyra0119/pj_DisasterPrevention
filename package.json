@@ -15,6 +15,7 @@
     "verify:systems": "node scripts/verify-systems.mjs",
     "verify:regulation": "node scripts/verify-regulation.mjs",
     "typecheck": "tsc",
-    "data:shelters": "node scripts/build-shelters.mjs"
+    "data:shelters": "node scripts/build-shelters.mjs",
+    "verify:traininfo": "node scripts/verify-traininfo.mjs"
   }
 }
