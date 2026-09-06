@@ -76,6 +76,9 @@ const RESUME_MINUTES = 5
  * @property {{lat:number, lon:number, label:string|null}|null} [at]
  *   最も揺れた地点。「どこで止まっているか」を言うのに要る。
  *   東海道新幹線は東京駅を通るが、大阪で止まっていても東京の電車は動く。
+ * @property {{label:string, distanceKm:number}|null} [source]
+ *   その震度を与えた気象庁の観測点と、判定地点からの距離。
+ *   推定の根拠なので、内訳を見せるときに要る。
  */
 
 /**
@@ -106,6 +109,7 @@ export function estimateSuspension(impact) {
   return {
     ...estimateFromLevel(impact.level, inspectionLengthKm(impact), uncertain),
     at: impact.at ? { lat: impact.at.lat, lon: impact.at.lon, label: impact.at.label ?? null } : null,
+    source: impact.source ?? null,
   }
 }
 
@@ -192,6 +196,8 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
   let unknownPoints = 0
   /** @type {{lat:number, lon:number, label:string|null}|null} */
   let at = null
+  /** @type {{label:string, distanceKm:number}|null} */
+  let source = null
   for (const [lat, lon] of geo) {
     const sample = sampleAt(field, lat, lon, radiusKm)
     if (sample.confidence === 'unknown') unknownPoints++
@@ -203,6 +209,9 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
     if (!level || SHINDO_ORDER[sample.level] > SHINDO_ORDER[level]) {
       level = sample.level
       at = { lat, lon, label: sample.source?.label ?? null }
+      source = sample.source
+        ? { label: sample.source.label, distanceKm: sample.source.distanceKm }
+        : null
     }
   }
 
@@ -246,6 +255,7 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
     return {
       ...worst,
       at: worst.at ?? at,
+      source: worst.source ?? source,
       systemLengthKm: Number(systemLengthKm.toFixed(1)),
       corridorKnown: false,
     }
@@ -260,6 +270,7 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
   return {
     ...base,
     at,
+    source,
     systemLengthKm: Number(systemLengthKm.toFixed(1)),
     corridorKnown: true,
   }

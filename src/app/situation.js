@@ -127,6 +127,8 @@ export function situationAt(place, field, lookup, impactsByLine, systemImpactsBy
         titleEn: null,
         suspension: estimateSuspension(impact),
         systemId: null,
+        parts: [],
+        partial: false,
       })
       continue
     }
@@ -141,6 +143,9 @@ export function situationAt(place, field, lookup, impactsByLine, systemImpactsBy
         titleEn: system.titleEn,
         suspension: estimateSystemSuspension(systemImpact, field),
         systemId: system.id,
+        // 内訳。この系統がどの線路名称を使っているか。
+        parts: systemImpact.lines.map((x) => `${x.line.operator} ${x.line.name}`),
+        partial: systemImpact.system.matched < systemImpact.system.total,
       })
     }
   }

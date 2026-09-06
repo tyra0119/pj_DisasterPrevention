@@ -247,7 +247,8 @@ function remaining(suspension, event) {
   return { over: false, min: Math.max(suspension.waitMinutes.min - elapsed, 0), max }
 }
 
-function waitText(suspension, event, lang) {
+/** 待ち時間の値だけ。見出しがある場所ではこちらを使う。 */
+function waitValue(suspension, event, lang) {
   const s = t(lang)
   if (suspension.openEnded) return s.noEstimate
   if (suspension.stage === 'caution') return s.expectDelay
@@ -255,13 +256,26 @@ function waitText(suspension, event, lang) {
   const rem = remaining(suspension, event)
   if (rem && rem.over) return s.inspectionPassed
 
-  const span = s.expectWait(`${formatDuration(rem.min, lang)}–${formatDuration(rem.max, lang)}`)
+  const span = `${formatDuration(rem.min, lang)}–${formatDuration(rem.max, lang)}`
   // 時刻も添える。「5時間35分」だけだと、その場で引き算をさせることになる。
   // 過去の地震を見ているときは、いまから数えても意味がないので出さない。
   if (isPastView()) return span
   const from = jstTime(new Date(Date.now() + rem.min * 60000).toISOString(), lang)
   const to = jstTime(new Date(Date.now() + rem.max * 60000).toISOString(), lang)
   return `${span} · ${s.resumeBy(from, to)}`
+}
+
+/** 見出しの無い場所で使う。「再開まで」を頭に付ける。 */
+function waitText(suspension, event, lang) {
+  const s = t(lang)
+  const value = waitValue(suspension, event, lang)
+  if (!value) return ''
+  // 幅を出せていないとき (見通し不明・遅れのみ・点検時間を過ぎた) は、
+  // その文言だけで意味が通っているので「再開まで」を付けない。
+  if (!suspension.waitMinutes || suspension.openEnded || suspension.stage === 'caution') return value
+  const rem = remaining(suspension, event)
+  if (rem && rem.over) return value
+  return s.expectWait(value)
 }
 
 /**
@@ -434,20 +448,86 @@ function verdictBlock(lang) {
   </section>`
 }
 
-function lineList(sit, lang) {
+function lineList(sit, placeId, lang) {
+  const s = t(lang)
   return sit.lines
-    .map((l) => {
+    .map((l, i) => {
       const name = pick(l.title, l.titleEn, lang)
       const advice = l.suspension.advice
+      const id = `ln:${placeId}:${i}`
+      const open = state.showLines.has(id)
       // 遠くで止まっている路線は、どこで止まっているかを添える。
       // 東海道新幹線は東京駅を通るが、大阪で止まっていても東京の電車は動く。
       const where =
         !l.nearby && l.suspension.at?.label
-          ? `<span class="ln-where">${esc(t(lang).stoppedAt(l.suspension.at.label))}</span>`
+          ? `<span class="ln-where">${esc(s.stoppedAt(l.suspension.at.label))}</span>`
           : ''
-      return `<li><span class="ln">${esc(name)}${where}</span><span class="chip c-${advice}">${esc(t(lang)[CHIP_KEY[advice]])}</span></li>`
+      return `<li>
+        <button class="lnrow" data-toggle="${esc(id)}" aria-expanded="${open}">
+          <span class="ln">${esc(name)}${where}</span>
+          <span class="chip c-${advice}">${esc(s[CHIP_KEY[advice]])}</span>
+          <span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>
+        </button>
+        ${open ? lineDetail(l, lang) : ''}
+      </li>`
     })
     .join('')
+}
+
+/**
+ * 路線ごとの推定の内訳。
+ *
+ * 数字を出す以上、どこから来た数字かを見せる。
+ * 「あとどれくらい」がこのアプリの中身なので、根拠が見えないと使えない。
+ */
+function lineDetail(entry, lang) {
+  const s = t(lang)
+  const sus = entry.suspension
+  const rows = []
+
+  if (!sus.level) {
+    rows.push(`<p class="hint">${esc(s.detNone)}</p>`)
+  } else {
+    rows.push(
+      row(
+        s.detMax,
+        `${esc(shindoLabel(sus.level, lang))}${sus.at?.label ? ` · ${esc(sus.at.label)}` : ''}`,
+      ),
+    )
+    if (sus.source) {
+      rows.push(row('', `<span class="muted">${esc(s.detSource(sus.source.label, sus.source.distanceKm.toFixed(1)))}</span>`))
+    }
+    if (sus.inspectionLengthKm) {
+      rows.push(row(s.detInspect, `${sus.inspectionLengthKm} km`))
+    }
+    const wait = waitValue(sus, analysis.event, lang)
+    if (wait) rows.push(row(s.detResume, esc(wait)))
+  }
+
+  if (entry.parts?.length > 1) {
+    rows.push(row(s.detParts, entry.parts.map(esc).join(' / ')))
+  }
+
+  const notes = []
+  if (entry.partial) notes.push(s.detPartial)
+  if (sus.uncertain) notes.push(s.detUncertain)
+  if (sus.level) notes.push(s.detBasis)
+
+  return `<div class="lndetail">
+    <dl>${rows.join('')}</dl>
+    ${notes.map((n) => `<p class="hint">${esc(n)}</p>`).join('')}
+  </div>`
+}
+
+const row = (label, value) => `<dt>${esc(label)}</dt><dd>${value}</dd>`
+
+/**
+ * 震度は画面の表では前面に出さないが、内訳では根拠として出す。
+ * 5弱/5強 は日本語圏の書き方なので、それ以外は 5- / 5+ のまま置く。
+ */
+function shindoLabel(level, lang) {
+  const v = lang === 'ja' || lang === 'zh' ? level.replace('-', '弱').replace('+', '強') : level
+  return t(lang).shindo(v)
 }
 
 /**
@@ -516,7 +596,7 @@ function rowPanel(entry, lang) {
     const sit = situation(entry.place, entry.hint)
     parts.push(
       sit.lines.length
-        ? `<ul class="lines">${lineList(sit, lang)}</ul>`
+        ? `<ul class="lines">${lineList(sit, entry.id, lang)}</ul>`
         : `<p class="hint">${esc(s.unknownHere)}</p>`,
     )
   }
