@@ -5,8 +5,33 @@
 // リンクを送るのが共有手段になる。
 //
 //   ?lang=en&home=35.6812,139.7671&homeName=Tokyo&flight=NRT&dep=2026-09-06T09:40
+//
+// URL だけに置くと、ブックマークやホーム画面から開き直したときに消える。
+// 朝に宿と便を入れて、地震のあとに開いたら全部消えている — それでは使えない。
+// 端末にも残しておき、URL に無いときはそこから戻す。
+// 過去の地震やテスト表示 (event / scenario) は残さない。翌日まで残ると事故になる。
 
 import { detectLang, LANG_CODES } from './i18n.js'
+
+const STORE_KEY = 'config'
+
+function restoreSaved() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function save(config) {
+  try {
+    const { lang, home, flightAirport, flightDeparture } = config
+    localStorage.setItem(STORE_KEY, JSON.stringify({ lang, home, flightAirport, flightDeparture }))
+  } catch {
+    // 書けない環境では URL だけが頼りになる。動作に必須ではない。
+  }
+}
 
 /**
  * @typedef {object} Config
@@ -34,8 +59,9 @@ const num = (v) => {
  */
 export function readConfig(search = location.search) {
   const q = new URLSearchParams(search)
+  const saved = restoreSaved()
 
-  const langParam = q.get('lang')
+  const langParam = q.get('lang') ?? saved?.lang
   const lang = LANG_CODES.includes(/** @type {any} */ (langParam))
     ? /** @type {import('./i18n.js').Lang} */ (langParam)
     : detectLang()
@@ -49,16 +75,23 @@ export function readConfig(search = location.search) {
     if (lat != null && lon != null && lat > 20 && lat < 46 && lon > 122 && lon < 154) {
       home = { lat, lon, name: q.get('homeName') || '', en: q.get('homeNameEn') || '' }
     }
+  } else if (saved?.home) {
+    home = saved.home
   }
 
-  return {
+  const config = {
     lang,
     home,
-    flightAirport: q.get('flight'),
-    flightDeparture: q.get('dep'),
+    flightAirport: q.get('flight') ?? saved?.flightAirport ?? null,
+    flightDeparture: q.get('dep') ?? saved?.flightDeparture ?? null,
     eventId: q.get('event'),
     scenarioId: q.get('scenario'),
   }
+
+  // 共有リンクで開いたときは、その時点で端末にも残す。
+  // 操作したときだけ保存していたら、リンクから開いてそのまま閉じた人は次に何も残らない。
+  if (['lang', 'home', 'flight', 'dep'].some((k) => q.has(k))) save(config)
+  return config
 }
 
 /**
@@ -80,5 +113,21 @@ export function writeConfig(config) {
 
   const url = `${location.pathname}?${q}`
   history.replaceState(null, '', url)
+  save(config)
   return new URL(url, location.href).href
+}
+
+/**
+ * 出発時刻を日本時間として読む。
+ *
+ * datetime-local の値には時間帯が無く、new Date() は端末の時間帯で解釈する。
+ * 旅行者の端末が出発国の時間のままだと、10:40 発が 17 時間ずれる。
+ * 日本の空港を発つ便なので、日本時間に決め打つ。
+ * @param {string|null} local  "YYYY-MM-DDTHH:MM"
+ * @returns {Date|null}
+ */
+export function departureAsJst(local) {
+  if (!local) return null
+  const d = new Date(/[+-]\d\d:\d\d$|Z$/.test(local) ? local : `${local}+09:00`)
+  return Number.isNaN(d.getTime()) ? null : d
 }

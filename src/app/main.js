@@ -9,7 +9,7 @@ import { assignToLines } from '../rail/assign.js'
 import { composeSystems, loadLineMap } from '../rail/systems.js'
 import { dataUrl } from '../data-url.js'
 import { formatDuration, LANGS, locale, t } from './i18n.js'
-import { readConfig, writeConfig } from './config.js'
+import { departureAsJst, readConfig, writeConfig } from './config.js'
 import { buildLookup, situationAt } from './situation.js'
 import { buildScenarioEvent, loadScenarios } from './scenario.js'
 import { hypocenterName, refreshHypocenterNames } from '../quake/jma.js'
@@ -20,6 +20,12 @@ import { addressAt } from './address.js'
 
 /** これより前の地震は、いま動くかどうかの判断には効かない。 */
 const RELEVANT_HOURS = 12
+/**
+ * 震度6弱以上は被害が出る領域で、復旧に日単位かかる (高浜・翠川 2011)。
+ * 12 時間で窓から落とすと、翌朝に「平常どおり」と出てしまう。
+ * 再開を知る術が無いあいだは、長めに残す方が安全側。
+ */
+const RELEVANT_HOURS_SEVERE = 48
 /** これ未満なら運転規制がかからない (高浜・翠川 2011 の第1段階が震度4)。 */
 const RELEVANT_LEVEL = '4'
 /** 空港へ向かうのに見ておく移動時間。これを引いて間に合うかを判断する。 */
@@ -105,11 +111,15 @@ function pickRelevant(events) {
     const found = events.find((e) => e.id === config.eventId)
     if (found) return found
   }
-  const cutoff = Date.now() - RELEVANT_HOURS * 3600 * 1000
+  const now = Date.now()
+  const windowFor = (e) =>
+    (SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER['6-'] ? RELEVANT_HOURS_SEVERE : RELEVANT_HOURS) *
+    3600 *
+    1000
   return (
     events
       .filter((e) => e.maxLevel && SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER[RELEVANT_LEVEL])
-      .filter((e) => Date.parse(e.occurredAt) >= cutoff)
+      .filter((e) => Date.parse(e.occurredAt) >= now - windowFor(e))
       // 窓の中で最も強いもの。同じ強さなら新しい方。
       //
       // 最初は「最新」を取っていた。すると震度5弱の本震のあとに震度4の余震が来た
@@ -733,7 +743,8 @@ function placeRow(entry, lang) {
   // 出国便だけは「間に合うか」を行に出す。ここが判断の分かれ目になる。
   let extra = ''
   if (entry.id === 'flight' && config.flightDeparture && !isPastView()) {
-    const untilMin = (new Date(config.flightDeparture).getTime() - Date.now()) / 60000
+    const dep = departureAsJst(config.flightDeparture)
+    const untilMin = dep ? (dep.getTime() - Date.now()) / 60000 : 0
     if (untilMin <= 0) {
       extra = `<p class="p-extra">${esc(s.flightPassed)}</p>`
     } else {
@@ -1090,9 +1101,23 @@ function renderResults(input, listId, onPick) {
   if (trimmed.length < 1) return closeHits(input, listId)
 
   const q = trimmed.toLowerCase()
-  const hits = data.places.stations
+  // 英語名を持つのは ODPT の駅 (ほぼ関東)。それで当たらなければ N02 の全駅 (日本語のみ) も見る。
+  // 京都や博多で英語名は引けないが、漢字が読める人と、駅名を書き写せる人には届く。
+  let hits = data.places.stations
     .filter((s) => s.en.toLowerCase().includes(q) || s.ja.includes(trimmed))
     .slice(0, 12)
+  if (hits.length === 0) {
+    const seen = new Set()
+    for (const line of data.rail.lines) {
+      for (const st of line.stations) {
+        if (!st.name.includes(trimmed) || seen.has(st.name)) continue
+        seen.add(st.name)
+        hits.push({ ja: st.name, en: '', lat: st.lat, lon: st.lon })
+        if (hits.length >= 12) break
+      }
+      if (hits.length >= 12) break
+    }
+  }
 
   if (hits.length === 0) {
     list.innerHTML = `<p class="hit-empty">${esc(t(config.lang).noResults)}</p>`
@@ -1106,7 +1131,7 @@ function renderResults(input, listId, onPick) {
       (s) =>
         `<button class="hit" data-lat="${s.lat}" data-lon="${s.lon}">
           <span class="hit-main">${esc(pick(s.ja, s.en, config.lang))}</span>
-          <span class="hit-sub">${esc(config.lang === 'ja' ? s.en : s.ja)}</span>
+          ${s.en && s.ja ? `<span class="hit-sub">${esc(config.lang === 'ja' ? s.en : s.ja)}</span>` : ''}
         </button>`,
     )
     .join('')
@@ -1116,11 +1141,9 @@ function renderResults(input, listId, onPick) {
     // blur より先に拾う。指を離す前に決まっていないと、畳まれてから click が来る。
     b.onmousedown = (ev) => ev.preventDefault()
     b.onclick = () => {
-      const st = data.places.stations.find(
-        (x) => x.lat === Number(b.dataset.lat) && x.lon === Number(b.dataset.lon),
-      )
+      const st = hits.find((x) => x.lat === Number(b.dataset.lat) && x.lon === Number(b.dataset.lon))
       closeHits(input, listId)
-      onPick({ lat: Number(b.dataset.lat), lon: Number(b.dataset.lon), name: st ? st.ja : '' , en: st ? st.en : '' })
+      onPick({ lat: Number(b.dataset.lat), lon: Number(b.dataset.lon), name: st?.ja ?? '', en: st?.en ?? '' })
     }
   }
 }
