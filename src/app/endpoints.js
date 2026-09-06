@@ -12,8 +12,8 @@
  * (秘密情報を自動で写すのは止めているので、ここは手で入れる)
  */
 export const ODPT_KEYS = [
-  { base: 'https://api.odpt.org/api/v4', key: '' },
-  { base: 'https://api-challenge.odpt.org/api/v4', key: '' },
+  { base: 'https://api.odpt.org/api/v4', key: 'b0mg7xyln1e8yd2d2uh2z4hea92r4zjphrkqsvmuzjqos1cdxi1ovwgoeoul7g78' },
+  { base: 'https://api-challenge.odpt.org/api/v4', key: '4venni83t6gaq25zkzgkwbp12ttn290qwvydonhs5si6g8mrdvpykjwezplekez9' },
 ].filter((k) => k.key)
 
 /**

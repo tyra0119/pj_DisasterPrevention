@@ -292,9 +292,10 @@ const situation = (place, hint) =>
     analysis.impactsByLine,
     analysis.systemImpactsById,
     hint,
-    // テスト表示中は実データの運行情報を混ぜない。作り物の地震に本物の平常運転が
-    // 乗ると、全部が「平常」に上書きされて確認にならない。
-    isTestMode() ? undefined : state.trainInfo,
+    // テスト表示中と過去の地震の再現中は、いまの運行情報を混ぜない。
+    // 作り物の地震や 2 週間前の地震に、今日の「平常運転」が乗ると、
+    // 全部が「平常」に上書きされて確認にならない。
+    isTestMode() || isPastView() ? undefined : state.trainInfo,
   )
 
 // ── 表示 ──────────────────────────────────────────────────
