@@ -33,6 +33,9 @@ const MAX_RADIUS_KM = 400
  * @property {ShindoLevel} maxLevel
  * @property {number} falloffKm  この距離ごとに震度が 1 段下がる。
  * @property {number} minutesAgo  何分前に起きたことにするか。
+ * @property {'prompt'} [stage]
+ *   'prompt' なら震度速報の段階を再現する。観測点単位の震度は無く、
+ *   細分区域の代表点だけ。発生から数分間の画面を確かめるのに要る。
  */
 
 /**
@@ -62,7 +65,26 @@ export function buildScenarioEvent(scenario, index) {
   const occurredAt = new Date(Date.now() - scenario.minutesAgo * 60000).toISOString()
 
   const observations = []
-  for (const station of index.stations) {
+
+  // 速報段階: 区域の代表点にだけ震度を振る。観測点単位はまだ無い。
+  if (scenario.stage === 'prompt') {
+    for (const area of index.areaByCode.values()) {
+      const d = distanceKm(scenario.hypocenter.lat, scenario.hypocenter.lon, area.lat, area.lon)
+      if (d > MAX_RADIUS_KM) continue
+      const order = top - Math.floor(d / scenario.falloffKm)
+      if (order < 1) continue
+      observations.push({
+        level: LEVELS[Math.min(order, LEVELS.length) - 1],
+        lat: area.lat,
+        lon: area.lon,
+        label: area.name,
+        pref: area.pref,
+        kind: 'area',
+      })
+    }
+  }
+
+  for (const station of scenario.stage === 'prompt' ? [] : index.stations) {
     const d = distanceKm(scenario.hypocenter.lat, scenario.hypocenter.lon, station.lat, station.lon)
     if (d > MAX_RADIUS_KM) continue
 
@@ -93,7 +115,7 @@ export function buildScenarioEvent(scenario, index) {
     },
     magnitude: scenario.magnitude,
     maxLevel: scenario.maxLevel,
-    resolution: 'station',
+    resolution: scenario.stage === 'prompt' ? 'area' : 'station',
     observations,
     unresolved: [],
   }

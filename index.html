@@ -83,6 +83,10 @@
       .v-delay { background: var(--c-delay); }
       .v-wait { background: var(--c-wait); }
       .v-avoid-rail { background: var(--c-avoid); }
+      /* 速報段階。まだ分からない、という状態に色を与える。平常の緑にしてはいけない。 */
+      .v-pending { background: var(--c-delay); }
+      /* 推定の上限を過ぎた。止まっているとも動いているとも言えないので琥珀。 */
+      .v-expired { background: var(--c-delay); }
       .v-unset {
         background: var(--panel); color: var(--fg);
         border: 1px solid var(--line);
@@ -151,6 +155,7 @@
       .c-delay { background: var(--c-delay); }
       .c-wait { background: var(--c-wait); }
       .c-avoid-rail { background: var(--c-avoid); }
+      .c-pending { background: var(--c-delay); }
       .c-unset { background: none; color: var(--muted); border: 1px solid var(--line); font-weight: 600; }
 
       ul.lines { list-style: none; margin: 0 0 .8rem; padding: 0; }

@@ -110,7 +110,16 @@ function pickRelevant(events) {
     events
       .filter((e) => e.maxLevel && SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER[RELEVANT_LEVEL])
       .filter((e) => Date.parse(e.occurredAt) >= cutoff)
-      .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))[0] ?? null
+      // 窓の中で最も強いもの。同じ強さなら新しい方。
+      //
+      // 最初は「最新」を取っていた。すると震度5弱の本震のあとに震度4の余震が来た
+      // 時点で判定が「遅れ・30分」に格下げされる。本震の点検はまだ続いている。
+      // 小さい余震で判定を下げてはいけない。大きい余震なら新しい方が勝つ。
+      .sort(
+        (a, b) =>
+          SHINDO_ORDER[b.maxLevel] - SHINDO_ORDER[a.maxLevel] ||
+          Date.parse(b.occurredAt) - Date.parse(a.occurredAt),
+      )[0] ?? null
   )
 }
 
@@ -146,7 +155,8 @@ async function refresh() {
   } catch (err) {
     // オフラインでも最後に見た内容は残す。取得時刻を必ず添えるので誤解しない。
     state.stale = true
-    if (!analysis) state.error = err.message
+    // 生のエラー文字列 (Failed to fetch) は読み手の言葉ではない。
+    if (!analysis) state.error = t(config.lang).fetchFailed
   }
   render()
 }
@@ -354,16 +364,35 @@ function places(lang) {
   return out
 }
 
+/** 震度速報しか無い段階か。観測点単位の震度が来るまで、場所ごとの推定は出せない。 */
+const isPromptStage = () => analysis?.event?.resolution === 'area'
+
 /** 画面全体の判定。いちばん重い場所に合わせ、待ち時間は代表値を使う。 */
 function overall(lang) {
   const s = t(lang)
   if (!analysis.event) {
-    return { advice: 'normal', status: s.statusNormal, lead: s.leadNormal, wait: '', decisionLead: '', note: '' }
+    return { advice: 'normal', status: s.statusNormal, lead: s.leadNormal, wait: '', lead2: '', note: '' }
+  }
+
+  // 発生から数分は震度速報 (区域単位) しか無く、観測点単位の推定が出せない。
+  // ここで場所ごとの計算をすると、全部 unknown → 「平常どおり」と出てしまう。
+  // 強い地震の直後に「平常」は最悪の誤り。速報段階だと言い切る。
+  if (isPromptStage()) {
+    return {
+      advice: 'pending',
+      status: s.statusPending,
+      lead: s.leadPending,
+      wait: '',
+      lead2: s.actPending,
+      note: '',
+    }
   }
 
   const known = places(lang).filter((p) => p.place)
   if (known.length === 0) {
-    return { advice: 'unset', status: '', lead: s.noPlaces, wait: '', decisionLead: '', note: '' }
+    // 場所が無くても、地震が起きたことと重さは見せる。
+    // 「いる場所を教えてください」だけだと、何が起きたか分からない。
+    return { advice: 'unset', status: s.statusQuake, lead: s.noPlaces, wait: '', lead2: '', note: '' }
   }
 
   let worst = null
@@ -378,17 +407,25 @@ function overall(lang) {
 
   const advice = worst.advice
   const decided = decision(lang, representative)
+
+  // 推定の上限を過ぎたら「止まっている見込み」とは言わない。
+  // 実際の再開を知る術が無いので、再開しているかもしれないと言う。
+  const rem = advice === 'wait' ? remaining(representative, analysis.event) : null
+  const expired = Boolean(rem && rem.over)
+
   return {
-    advice,
-    status: s[STATUS_KEY[advice]],
-    lead: s[LEAD_KEY[advice]],
+    // 上限を過ぎたら見た目も「止まっている」から落とす。赤のままだと言葉と色が食い違う。
+    advice: expired ? 'expired' : advice,
+    status: expired ? s.statusMayResume : s[STATUS_KEY[advice]],
+    lead: expired ? s.leadMayResume : s[LEAD_KEY[advice]],
     // 待ち時間は代表値。いちばん長い路線に引きずられると、
     // 数駅戻るだけの人にまで長い時間を言うことになる。
     //
     // 平常時は出さない。被害の領域でも出さない
     // (「見通し不明」はリード文がすでに言っていて、二度言うと読み飛ばされる)。
+    // 上限を過ぎた後も出さない (リード文が言っている)。
     wait:
-      advice === 'normal' || advice === 'avoid-rail'
+      advice === 'normal' || advice === 'avoid-rail' || expired
         ? ''
         : waitText(representative, analysis.event, lang),
     // decision の lead は「今夜戻れるか」。上の lead (なぜ止まっているか) とは別。
@@ -421,9 +458,12 @@ function decision(lang, representative) {
 
   // 止まっている。再開の最も遅い見込みに、宿までの移動を足して終電と比べる。
   const rem = remaining(representative, analysis.event)
-  const untilLast = minutesUntilLastTrain()
-  if (!rem || rem.over) return { lead: s.actWait, note: '' }
+  if (!rem) return { lead: s.actWait, note: '' }
+  // 推定の上限を過ぎた。「そのまま待て」と言い続けてはいけない。
+  // 再開していれば、待っている人は無駄に足止めされている。
+  if (rem.over) return { lead: s.actMayResume, note: '' }
 
+  const untilLast = minutesUntilLastTrain()
   const backBy = rem.max + RIDE_HOME_MIN
   if (untilLast > 0 && backBy < untilLast) {
     return { lead: s.backTonight, note: s.actWait }
@@ -435,6 +475,7 @@ function verdictBlock(lang) {
   const v = overall(lang)
   if (v.advice === 'unset') {
     return `<section class="verdict v-unset">
+      ${v.status ? `<p class="v-status">${esc(v.status)}</p>` : ''}
       <p class="v-lead">${esc(v.lead)}</p>
     </section>`
   }
@@ -675,7 +716,19 @@ function placeRow(entry, lang) {
   const sit = situation(entry.place, entry.hint)
   const unknown = sit.worst.stage === 'none' && sit.confidence === 'unknown'
   const advice = sit.worst.advice
-  const chip = unknown ? s.chipUnknown : s[CHIP_KEY[advice]]
+  // 推定の上限を過ぎた路線は「停止」と言い切らない。
+  // 判定帯と同じく代表値で見る。最も重い路線で見ると、新幹線の 10 時間に引きずられて
+  // 帯は「再開しているかも」なのに行は「停止」のまま、という食い違いが出る。
+  const expired = advice === 'wait' && Boolean(remaining(sit.typical, analysis.event)?.over)
+  // 速報段階は「不明」ではなく「速報」。数分待てば出る、という意味が伝わる。
+  const chip = isPromptStage()
+    ? s.chipPending
+    : expired
+      ? s.chipCheck
+      : unknown
+        ? s.chipUnknown
+        : s[CHIP_KEY[advice]]
+  const chipClass = isPromptStage() || expired ? 'pending' : unknown ? 'unset' : advice
 
   // 出国便だけは「間に合うか」を行に出す。ここが判断の分かれ目になる。
   let extra = ''
@@ -694,7 +747,10 @@ function placeRow(entry, lang) {
           : worstCase <= untilMin * 1.5
             ? s.flightTight
             : s.flightUnlikely
-      extra = `<p class="p-extra">${esc(s.flightIn(formatDuration(untilMin, lang)))} · ${esc(verdict)}</p>`
+      // 間に合わなさそうなときだけ、鉄道以外の手段に触れる。
+      // 空港バスやタクシーは震度5弱程度なら動いていることが多い。
+      const alt = verdict === s.flightOk ? '' : ` ${esc(s.altTransport)}`
+      extra = `<p class="p-extra">${esc(s.flightIn(formatDuration(untilMin, lang)))} · ${esc(verdict)}${alt}</p>`
     }
   }
 
@@ -702,7 +758,7 @@ function placeRow(entry, lang) {
     <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
       <span class="p-label">${esc(entry.label)}</span>
       <span class="p-name">${esc(placeName(entry.place, lang))}</span>
-      <span class="chip c-${unknown ? 'unset' : advice}">${esc(chip)}</span>
+      <span class="chip c-${chipClass}">${esc(chip)}</span>
       ${chevron}
     </button>
     ${extra}
