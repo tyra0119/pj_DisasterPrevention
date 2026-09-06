@@ -358,6 +358,19 @@
         color: var(--muted); font-weight: 600;
       }
       .dlg-body label.sub { margin-top: .5rem; text-transform: none; letter-spacing: 0; }
+      /* 場所ごとの設定は枠で囲う。どこからどこまでが一つの項目か、目で分かるように。 */
+      .dlg-box {
+        border: 1px solid var(--line); border-radius: .6rem;
+        padding: .75rem .85rem .85rem; margin: .8rem 0;
+        background: var(--panel);
+      }
+      .dlg-box h3 {
+        margin: 0 0 .4rem; font-size: .72rem; font-weight: 700;
+        letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+      }
+      .dlg-box .value { margin: 0 0 .4rem; }
+      .dlg-box .rowacts { margin: .5rem 0 0; }
+      .dlg-box .hitwrap input, .dlg-box .field select, .dlg-box .field input { background: var(--bg); }
       .dlg-body .value { margin: 0 0 .4rem; font-weight: 600; }
       .dlg-body .hint { font-size: .8rem; color: var(--muted); margin: 0 0 .5rem; }
       .dlg-body .field { margin: .3rem 0; }

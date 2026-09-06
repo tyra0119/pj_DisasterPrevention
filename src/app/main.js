@@ -995,32 +995,38 @@ function settingsDialog(lang) {
       <button class="x" aria-label="${esc(s.close)}">&times;</button>
     </form>
     <div class="dlg-body">
-      <label>${esc(s.hereTitle)}</label>
-      <p class="value">${state.here ? esc(placeName(state.here, lang)) : esc(s.notSet)}</p>
-      <div class="rowacts">
-        <button class="pill" data-locate="1">${esc(state.here ? s.recheckLocation : s.setLocation)}</button>
-      </div>
-      ${picker('here-search', 'here-results', s.pickStation)}
+      <section class="dlg-box">
+        <h3>${esc(s.hereTitle)}</h3>
+        <p class="value">${state.here ? esc(placeName(state.here, lang)) : esc(s.notSet)}</p>
+        <div class="rowacts">
+          <button class="pill" data-locate="1">${esc(state.here ? s.recheckLocation : s.setLocation)}</button>
+        </div>
+        ${picker('here-search', 'here-results', s.pickStation)}
+      </section>
 
-      <label>${esc(s.homeTitle)}</label>
-      <p class="value">${config.home ? esc(placeName(config.home, lang)) : esc(s.notSet)}</p>
-      <p class="hint">${esc(s.homeHelp)}</p>
-      ${picker('home-search', 'home-results', s.searchHome)}
-      <div class="rowacts">
-        ${state.here ? `<button class="pill" data-sethome="1">${esc(s.setHome)}</button>` : ''}
-        ${config.home ? `<button class="pill" data-clearhome="1">${esc(s.clear)}</button>` : ''}
-      </div>
+      <section class="dlg-box">
+        <h3>${esc(s.homeTitle)}</h3>
+        <p class="value">${config.home ? esc(placeName(config.home, lang)) : esc(s.notSet)}</p>
+        <p class="hint">${esc(s.homeHelp)}</p>
+        ${picker('home-search', 'home-results', s.searchHome)}
+        <div class="rowacts">
+          ${state.here ? `<button class="pill" data-sethome="1">${esc(s.setHome)}</button>` : ''}
+          ${config.home ? `<button class="pill" data-clearhome="1">${esc(s.clear)}</button>` : ''}
+        </div>
+      </section>
 
-      <label for="airport">${esc(s.flightTitle)}</label>
-      <div class="field"><select id="airport"><option value="">—</option>${options}</select></div>
-      <div class="field">
-        <label for="dep" class="sub">${esc(s.departureTime)}</label>
-        <input id="dep" type="datetime-local" value="${esc(config.flightDeparture ?? '')}">
-      </div>
-      <div class="rowacts">
-        <button class="pill primary" data-savefl="1">${esc(s.save)}</button>
-        ${config.flightAirport ? `<button class="pill" data-clearfl="1">${esc(s.clear)}</button>` : ''}
-      </div>
+      <section class="dlg-box">
+        <h3>${esc(s.flightTitle)}</h3>
+        <div class="field"><select id="airport"><option value="">—</option>${options}</select></div>
+        <div class="field">
+          <label for="dep" class="sub">${esc(s.departureTime)}</label>
+          <input id="dep" type="datetime-local" value="${esc(config.flightDeparture ?? '')}">
+        </div>
+        <div class="rowacts">
+          <button class="pill primary" data-savefl="1">${esc(s.save)}</button>
+          ${config.flightAirport ? `<button class="pill" data-clearfl="1">${esc(s.clear)}</button>` : ''}
+        </div>
+      </section>
 
       <label>${esc(s.language)}</label>
       <div class="rowacts">${langs}</div>
