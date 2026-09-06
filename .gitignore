@@ -6,3 +6,7 @@ node_modules/
 
 # Obsidian のワークスペース状態は毎回変わるので追わない
 vault/.obsidian/workspace.json
+
+# 応募用の動画 (44MB) と音声入りスライド。生成物で、OneDrive 側に残る。元は 紹介スライド.pptx
+公共交通オープンデータチャレンジ2026/*.mp4
+公共交通オープンデータチャレンジ2026/*_ナレーション付き.pptx

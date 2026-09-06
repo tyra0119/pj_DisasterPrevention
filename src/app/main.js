@@ -314,6 +314,7 @@ const jstFull = (d, lang) =>
   new Intl.DateTimeFormat(locale(lang), {
     dateStyle: 'short',
     timeStyle: 'medium',
+    hourCycle: 'h23',
     timeZone: 'Asia/Tokyo',
   }).format(d)
 
@@ -634,7 +635,10 @@ function lineDetail(entry, lang) {
 
   if (entry.operatorText || entry.operatorTextEn) {
     const text = lang === 'ja' ? entry.operatorText : entry.operatorTextEn || entry.operatorText
-    rows.push(row(s.detOperator, esc(text)))
+    // 運行情報の生成時刻。ODPT の利用ガイドラインが、運行情報のような動的データには
+    // 生成時刻の画面表示を求めている。古い案内を今のことだと思わせないためでもある。
+    const at = entry.operatorUpdated ? ` <span class="src">${esc(s.asOf(jstTime(entry.operatorUpdated, lang)))} JST</span>` : ''
+    rows.push(row(s.detOperator, esc(text) + at))
   }
 
   const notes = []
@@ -1098,7 +1102,8 @@ function render() {
     <section class="caveat">
       <h2>${esc(s.caveatTitle)}</h2>
       <p>${esc(s.caveat)}</p>
-      <p class="src">${esc(s.sources)}: 気象庁 / P2P地震情報 / 国土数値情報（鉄道データ）CC BY 4.0 / 公共交通オープンデータセンター / 高浜・翠川 (2011) 日本地震工学会論文集 11(2)</p>
+      <p class="src">${esc(s.sources)}: 気象庁 / P2P地震情報 / 国土数値情報（鉄道データ）CC BY 4.0 / <a href="https://www.odpt.org/" rel="noopener">公共交通オープンデータセンター</a> / 国土地理院（指定緊急避難場所・地理院タイル・逆ジオコーダ） / 東京都オープンデータカタログ（一時滞在施設）CC BY 4.0 / 高浜・翠川 (2011) 日本地震工学会論文集 11(2)</p>
+      <p class="src">${esc(s.odptCredit)}</p>
       <p class="src"><a href="test.html">test</a> · <a href="diagnostics.html">diagnostics</a></p>
     </section>`
   wire()

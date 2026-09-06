@@ -177,6 +177,7 @@ export function situationAt(place, field, lookup, impactsByLine, systemImpactsBy
       entry.confirmed = info.status
       entry.operatorText = info.text
       entry.operatorTextEn = info.textEn
+      entry.operatorUpdated = info.updated
       if (info.status === 'normal') {
         entry.suspension = {
           ...entry.suspension,
