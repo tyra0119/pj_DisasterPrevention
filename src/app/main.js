@@ -17,6 +17,7 @@ import { mapFrame, paintMaps } from './map.js'
 import { sheltersNear } from './shelters.js'
 import { loadTempShelters, tempSheltersNear } from './temp-shelters.js'
 import { addressAt } from './address.js'
+import { loadTrainInfo } from './train-info.js'
 
 /** これより前の地震は、いま動くかどうかの判断には効かない。 */
 const RELEVANT_HOURS = 12
@@ -54,6 +55,8 @@ const state = {
   shelters: /** @type {{key: string, list: any[]|null}} */ ({ key: '', list: null }),
   /** 現在地の住所。逆ジオコーディングで引く。 */
   address: /** @type {{key: string, text: string|null}} */ ({ key: '', text: null }),
+  /** 事業者の運行情報。中継先が無ければ空のまま。 */
+  trainInfo: /** @type {Map<string, import('./train-info.js').TrainInfo>} */ (new Map()),
 }
 let data = null
 let analysis = null
@@ -105,32 +108,47 @@ function currentScenario() {
  * 余震が来れば点検がやり直しになるため。経過時間は別に見せて、
  * 「あとどれくらいか」を利用者が引き算しなくて済むようにする。
  */
+/**
+ * いまの判断に効く地震を選ぶ。1 つではなく、窓の中の全部。
+ *
+ * 別々の地域で同時に地震が起きることがある。大阪で震度6弱、東京で震度4なら、
+ * 東京にいる人には東京の 30 分の遅れの方が効く。片方だけ見ると、それが消える。
+ *
+ * 返すのは強い順。先頭が「主」で、見出しや震源の表示に使う。
+ * 場所ごとの推定は、全部の地震の観測を合成した場で行う。
+ *
+ * @returns {import('../quake/types.js').QuakeEvent[]}
+ */
 function pickRelevant(events) {
-  // 過去の地震を指定されているなら、窓を無視してそれを見る。
+  // 過去の地震を指定されているなら、窓を無視してそれだけを見る。
   if (config.eventId) {
     const found = events.find((e) => e.id === config.eventId)
-    if (found) return found
+    if (found) return [found]
   }
   const now = Date.now()
   const windowFor = (e) =>
     (SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER['6-'] ? RELEVANT_HOURS_SEVERE : RELEVANT_HOURS) *
     3600 *
     1000
-  return (
-    events
-      .filter((e) => e.maxLevel && SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER[RELEVANT_LEVEL])
-      .filter((e) => Date.parse(e.occurredAt) >= now - windowFor(e))
-      // 窓の中で最も強いもの。同じ強さなら新しい方。
-      //
-      // 最初は「最新」を取っていた。すると震度5弱の本震のあとに震度4の余震が来た
-      // 時点で判定が「遅れ・30分」に格下げされる。本震の点検はまだ続いている。
-      // 小さい余震で判定を下げてはいけない。大きい余震なら新しい方が勝つ。
-      .sort(
-        (a, b) =>
-          SHINDO_ORDER[b.maxLevel] - SHINDO_ORDER[a.maxLevel] ||
-          Date.parse(b.occurredAt) - Date.parse(a.occurredAt),
-      )[0] ?? null
-  )
+
+  const relevant = events
+    .filter((e) => e.maxLevel && SHINDO_ORDER[e.maxLevel] >= SHINDO_ORDER[RELEVANT_LEVEL])
+    .filter((e) => Date.parse(e.occurredAt) >= now - windowFor(e))
+    // 強い順。同じ強さなら新しい方。小さい余震で判定を下げないため。
+    .sort(
+      (a, b) =>
+        SHINDO_ORDER[b.maxLevel] - SHINDO_ORDER[a.maxLevel] ||
+        Date.parse(b.occurredAt) - Date.parse(a.occurredAt),
+    )
+
+  // 同じ地震の続報 (速報 → 詳細) は発生時刻が同じ。詳細だけ残す。
+  const seen = new Set()
+  return relevant.filter((e) => {
+    const key = e.occurredAt
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 async function refresh() {
@@ -141,13 +159,16 @@ async function refresh() {
   if (scenario) {
     state.fetchedAt = new Date()
     state.stale = false
-    analysis = analyse(buildScenarioEvent(scenario, data.index))
+    analysis = analyse([buildScenarioEvent(scenario, data.index)])
     render()
     return
   }
 
   // 震源地名の対訳を拾っておく。失敗しても日本語名で動く。
   refreshHypocenterNames()
+
+  // 運行情報は地震情報と並行して取る。失敗しても投げない (補助なので)。
+  const trainInfoPromise = loadTrainInfo()
 
   try {
     let events = await fetchRecent(data.index, { limit: PAGE })
@@ -160,8 +181,9 @@ async function refresh() {
     }
     state.fetchedAt = new Date()
     state.stale = false
-    const event = pickRelevant(events)
-    analysis = event ? analyse(event) : { event: null }
+    const relevant = pickRelevant(events)
+    analysis = relevant.length ? analyse(relevant) : { event: null }
+    state.trainInfo = await trainInfoPromise
   } catch (err) {
     // オフラインでも最後に見た内容は残す。取得時刻を必ず添えるので誤解しない。
     state.stale = true
@@ -171,12 +193,45 @@ async function refresh() {
   render()
 }
 
-function analyse(event) {
-  const field = prepareField(event, data.index)
+/**
+ * 複数の地震を 1 つの場に合成する。
+ *
+ * 観測点ごとに最も強い震度を取る。その震度を与えた地震の発生時刻は
+ * 観測点に付いているので、点検の起点は地震ごとに正しく数えられる。
+ *
+ * 主 (先頭) が速報段階なら、場は速報段階として扱う。古い地震の観測点単位の
+ * 震度で「止まっている見込み」を出しても、いま起きた大きい方の話ができていない。
+ *
+ * @param {import('../quake/types.js').QuakeEvent[]} events  強い順
+ */
+function analyse(events) {
+  const primary = events[0]
+
+  /** @type {Map<string, import('../quake/types.js').Observation>} */
+  const byStation = new Map()
+  for (const e of events) {
+    for (const o of e.observations) {
+      if (o.kind !== 'station') continue
+      const key = `${o.pref}\u0000${o.label}`
+      const cur = byStation.get(key)
+      if (!cur || SHINDO_ORDER[o.level] > SHINDO_ORDER[cur.level]) byStation.set(key, o)
+    }
+  }
+
+  const merged = {
+    ...primary,
+    observations: [...byStation.values()],
+    // 主が速報段階なら、合成後も速報段階。観測点単位の震度が無い地震が主だから。
+    resolution: primary.resolution === 'area' ? 'area' : 'station',
+    // 何件を合成したか。震源の行に「ほか N 件」と出す。
+    others: events.length - 1,
+  }
+
+  const field = prepareField(merged, data.index)
   const impacts = assignToLines(field, data.rail.lines, { radiusKm: 20 })
   const systems = composeSystems(impacts, data.lineMap)
   return {
-    event,
+    event: merged,
     field,
     impactsByLine: new Map(impacts.map((i) => [i.line.id, i])),
     systemImpactsById: new Map(systems.map((s) => [s.system.id, s])),
@@ -237,6 +292,9 @@ const situation = (place, hint) =>
     analysis.impactsByLine,
     analysis.systemImpactsById,
     hint,
+    // テスト表示中は実データの運行情報を混ぜない。作り物の地震に本物の平常運転が
+    // 乗ると、全部が「平常」に上書きされて確認にならない。
+    isTestMode() ? undefined : state.trainInfo,
   )
 
 // ── 表示 ──────────────────────────────────────────────────
@@ -264,7 +322,9 @@ const isPastView = () => Boolean(config.eventId && analysis?.event && config.eve
  */
 function remaining(suspension, event) {
   if (!suspension.waitMinutes) return null
-  const elapsed = isPastView() ? 0 : (Date.now() - Date.parse(event.occurredAt)) / 60000
+  // 複数の地震を合成しているとき、点検の起点はその震度を与えた地震から数える。
+  const since = suspension.source?.occurredAt ?? event.occurredAt
+  const elapsed = isPastView() ? 0 : (Date.now() - Date.parse(since)) / 60000
   const max = suspension.waitMinutes.max - elapsed
   if (max <= 0) return { over: true, min: 0, max: 0 }
   return { over: false, min: Math.max(suspension.waitMinutes.min - elapsed, 0), max }
@@ -516,10 +576,12 @@ function lineList(sit, placeId, lang) {
         !l.nearby && l.suspension.at?.label
           ? `<span class="ln-where">${esc(s.stoppedAt(l.suspension.at.label))}</span>`
           : ''
+      // 事業者の運行情報で裏が取れていれば ✓。見込みではなく事実。
+      const mark = l.confirmed ? `<span class="confirmed" title="${esc(s.confirmedBy)}">✓</span>` : ''
       return `<li>
         <button class="lnrow" data-toggle="${esc(id)}" aria-expanded="${open}">
           <span class="ln">${esc(name)}${where}</span>
-          <span class="chip c-${advice}">${esc(s[CHIP_KEY[advice]])}</span>
+          <span class="chip c-${advice}">${mark}${esc(s[CHIP_KEY[advice]])}</span>
           <span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>
         </button>
         ${open ? lineDetail(l, lang) : ''}
@@ -566,6 +628,11 @@ function lineDetail(entry, lang) {
     rows.push(row(s.detParts, entry.parts.map(esc).join(' / ')))
   }
 
+  if (entry.operatorText || entry.operatorTextEn) {
+    const text = lang === 'ja' ? entry.operatorText : entry.operatorTextEn || entry.operatorText
+    rows.push(row(s.detOperator, esc(text)))
+  }
+
   const notes = []
   if (entry.partial) notes.push(s.detPartial)
   if (sus.uncertain) notes.push(s.detUncertain)
@@ -608,46 +675,22 @@ function picker(inputId, listId, placeholder) {
  * 設定だけ別画面に飛ばすと「タップして設定 → さらに設定を押す」になり、
  * しかも関係のない項目まで一緒に出てしまう。
  */
+/**
+ * 行を開いたときの中身は路線だけ。
+ *
+ * 一度は設定を行の中に置いたが、路線を見たいだけなのに設定欄まで開いて
+ * 操作しにくかった。設定は右上の設定ボタンに集める。
+ * 未設定の行を押したときも、設定ダイアログを開く。
+ */
 function rowPanel(entry, lang) {
   const s = t(lang)
   const parts = []
 
-  if (entry.id === 'here') {
-    if (entry.place?.geo) {
-      // 住所は行の見出しに出ている。ここは座標だけ。二度書くと読み飛ばされる。
-      parts.push(
-        `<p class="addr"><span class="addr-sub">${esc(s.coordsOnly(entry.place.lat.toFixed(4), entry.place.lon.toFixed(4)))}</span></p>`,
-      )
-    }
-    parts.push(`<div class="rowacts">
-      <button class="pill" data-locate="1">${esc(entry.place ? s.recheckLocation : s.setLocation)}</button>
-    </div>`)
-    parts.push(picker('here-search', 'here-results', s.pickStation))
-  } else if (entry.id === 'home') {
-    parts.push(`<p class="hint">${esc(s.homeHelp)}</p>`)
-    parts.push(picker('home-search', 'home-results', s.searchHome))
-    if (entry.place) {
-      parts.push(`<div class="rowacts"><button class="pill" data-clearhome="1">${esc(s.clear)}</button></div>`)
-    }
-  } else if (entry.id === 'flight') {
-    const options = data.places.airports
-      .map(
-        (a) =>
-          `<option value="${esc(a.iata)}"${config.flightAirport === a.iata ? ' selected' : ''}>${esc(airportName(a, lang))} (${esc(a.iata)})</option>`,
-      )
-      .join('')
-    parts.push(`<div class="field">
-        <label for="airport">${esc(s.chooseAirport)}</label>
-        <select id="airport"><option value="">—</option>${options}</select>
-      </div>
-      <div class="field">
-        <label for="dep">${esc(s.departureTime)}</label>
-        <input id="dep" type="datetime-local" value="${esc(config.flightDeparture ?? '')}">
-      </div>
-      <div class="rowacts">
-        <button class="pill primary" data-savefl="1">${esc(s.save)}</button>
-        ${config.flightAirport ? `<button class="pill" data-clearfl="1">${esc(s.clear)}</button>` : ''}
-      </div>`)
+  if (entry.id === 'here' && entry.place?.geo) {
+    // 住所は行の見出しに出ている。ここは座標だけ。
+    parts.push(
+      `<p class="addr"><span class="addr-sub">${esc(s.coordsOnly(entry.place.lat.toFixed(4), entry.place.lon.toFixed(4)))}</span></p>`,
+    )
   }
 
   if (entry.place && analysis.event) {
@@ -659,6 +702,7 @@ function rowPanel(entry, lang) {
     )
   }
 
+  parts.push(`<div class="rowacts"><button class="pill" data-opensettings="1">${esc(s.change)}</button></div>`)
   return `<div class="panel">${parts.join('')}</div>`
 }
 
@@ -699,14 +743,14 @@ function placeRow(entry, lang) {
   const chevron = `<span class="chev" aria-hidden="true">${open ? '−' : '+'}</span>`
 
   if (!entry.place) {
-    return `<li class="place${open ? ' open' : ''}">
-      <button class="prow" data-toggle="${esc(entry.id)}" aria-expanded="${open}">
+    // 未設定の行は開いても何も無い。押したら設定ダイアログへ。
+    return `<li class="place">
+      <button class="prow" data-opensettings="1">
         <span class="p-label">${esc(entry.label)}</span>
         <span class="p-name muted">${esc(s.tapToSet)}</span>
         <span class="chip c-unset">${esc(s.notSet)}</span>
-        ${chevron}
+        <span class="chev" aria-hidden="true">›</span>
       </button>
-      ${open ? rowPanel(entry, lang) : ''}
     </li>`
   }
 
@@ -863,6 +907,13 @@ function shelterSection(lang) {
         markers: [
           { lat: me.lat, lon: me.lon, kind: 'me', label: esc(s.youAreHere) },
           ...temp.list.map((x, i) => ({ lat: x.lat, lon: x.lon, kind: 'stay', label: String(i + 1) })),
+          // 危険から逃げる場所も同じ地図に。色を変えて、番号は別に振る。
+          ...(state.shelters.list ?? []).map((x, i) => ({
+            lat: x.lat,
+            lon: x.lon,
+            kind: 'shelter',
+            label: String.fromCharCode(65 + i),
+          })),
         ],
         note: esc(s.shelterMapNote),
         labels: mapLabels(lang),
@@ -903,10 +954,12 @@ function shelterSection(lang) {
 /** 避難先の一覧。番号は地図の印と対応させる。 */
 function shelterRows(list, kind, lang) {
   const s = t(lang)
+  // 一時滞在施設は 1,2,3、避難場所は A,B,C。同じ地図に載せても取り違えない。
+  const mark = (i) => (kind === 'shelter' ? String.fromCharCode(65 + i) : String(i + 1))
   return list
     .map(
       (x, i) => `<li>
-        <span class="sh-no sh-${kind}">${i + 1}</span>
+        <span class="sh-no sh-${kind}">${mark(i)}</span>
         <span class="sh-body">
           <span class="sh-name">${esc(x.name)}</span>
           <span class="sh-sub">${esc(x.address)} · ${esc(s.shelterDistance(x.distanceKm.toFixed(1)))}</span>
@@ -918,12 +971,22 @@ function shelterRows(list, kind, lang) {
     .join('')
 }
 
+/**
+ * 設定はダイアログに集める。いまいる場所・宿・出国便・言語・共有。
+ * 行の中に置くと、路線を見たいだけのときに邪魔になる。
+ */
 function settingsDialog(lang) {
   const s = t(lang)
   const langs = LANGS.map(
     (l) =>
       `<button class="pill${l.code === lang ? ' on' : ''}" data-lang="${esc(l.code)}">${esc(l.label)}</button>`,
   ).join('')
+  const options = data.places.airports
+    .map(
+      (a) =>
+        `<option value="${esc(a.iata)}"${config.flightAirport === a.iata ? ' selected' : ''}>${esc(airportName(a, lang))} (${esc(a.iata)})</option>`,
+    )
+    .join('')
 
   return `<dialog id="settings">
     <form method="dialog" class="dlg-head">
@@ -931,10 +994,39 @@ function settingsDialog(lang) {
       <button class="x" aria-label="${esc(s.close)}">&times;</button>
     </form>
     <div class="dlg-body">
+      <label>${esc(s.hereTitle)}</label>
+      <p class="value">${state.here ? esc(placeName(state.here, lang)) : esc(s.notSet)}</p>
+      <div class="rowacts">
+        <button class="pill" data-locate="1">${esc(state.here ? s.recheckLocation : s.setLocation)}</button>
+      </div>
+      ${picker('here-search', 'here-results', s.pickStation)}
+
+      <label>${esc(s.homeTitle)}</label>
+      <p class="value">${config.home ? esc(placeName(config.home, lang)) : esc(s.notSet)}</p>
+      <p class="hint">${esc(s.homeHelp)}</p>
+      ${picker('home-search', 'home-results', s.searchHome)}
+      <div class="rowacts">
+        ${state.here ? `<button class="pill" data-sethome="1">${esc(s.setHome)}</button>` : ''}
+        ${config.home ? `<button class="pill" data-clearhome="1">${esc(s.clear)}</button>` : ''}
+      </div>
+
+      <label for="airport">${esc(s.flightTitle)}</label>
+      <div class="field"><select id="airport"><option value="">—</option>${options}</select></div>
+      <div class="field">
+        <label for="dep" class="sub">${esc(s.departureTime)}</label>
+        <input id="dep" type="datetime-local" value="${esc(config.flightDeparture ?? '')}">
+      </div>
+      <div class="rowacts">
+        <button class="pill primary" data-savefl="1">${esc(s.save)}</button>
+        ${config.flightAirport ? `<button class="pill" data-clearfl="1">${esc(s.clear)}</button>` : ''}
+      </div>
+
       <label>${esc(s.language)}</label>
       <div class="rowacts">${langs}</div>
+
       <label>${esc(s.shareLabel)}</label>
       <div class="rowacts"><button class="pill" data-share="1">${esc(s.share)}</button></div>
+      <p class="hint share-status" id="share-status" hidden></p>
     </div>
   </dialog>`
 }
@@ -947,7 +1039,7 @@ function body(lang) {
   const e = analysis.event
   const quakeLine = e
     ? `<p class="quake${config.eventId === e.id ? ' past' : ''}">
-         ${e.magnitude ? `${esc(s.magnitude(e.magnitude))} · ` : ''}${esc(hypocenterName(e.hypocenter, lang))} · ${esc(jstTime(e.occurredAt, lang))}
+         ${e.magnitude ? `${esc(s.magnitude(e.magnitude))} · ` : ''}${esc(hypocenterName(e.hypocenter, lang))} · ${esc(jstTime(e.occurredAt, lang))}${e.others ? ` · ${esc(s.otherQuakes(e.others))}` : ''}
          ${config.eventId === e.id ? `<span class="past-note">${esc(s.pastEvent(jstFull(new Date(e.occurredAt), lang)))}</span>` : ''}
        </p>`
     : ''
@@ -1038,44 +1130,66 @@ function wire() {
     writeConfig(config)
     refresh()
   })
-  on('[data-locate]', locate)
+  // ダイアログの中で操作したら、描き直した後もダイアログを開いたままにする。
+  // 閉じてしまうと、宿と便を続けて入れる人が毎回開き直すことになる。
+  const rerender = () => {
+    const wasOpen = $('settings')?.open
+    render()
+    if (wasOpen) $('settings')?.showModal()
+  }
+
+  on('[data-locate]', () => locate(rerender))
+  on('[data-sethome]', () => {
+    config.home = { ...state.here }
+    writeConfig(config)
+    rerender()
+  })
   on('[data-clearhome]', () => {
     config.home = null
     writeConfig(config)
-    render()
+    rerender()
   })
   on('[data-savefl]', () => {
     config.flightAirport = $('airport').value || null
     config.flightDeparture = $('dep').value || null
     writeConfig(config)
-    render()
+    rerender()
   })
   on('[data-clearfl]', () => {
     config.flightAirport = null
     config.flightDeparture = null
     writeConfig(config)
-    render()
+    rerender()
   })
-  on('[data-share]', async (ev) => {
+  on('[data-share]', async () => {
     const url = writeConfig(config)
+    const status = $('share-status')
+    // 押した結果は必ず見せる。コピーできたのか分からないと、二度三度押すことになる。
     try {
       await navigator.clipboard.writeText(url)
-      ev.currentTarget.textContent = t(config.lang).copied
+      if (status) {
+        status.textContent = t(config.lang).copied
+        status.hidden = false
+      }
     } catch {
-      // クリップボードが使えない環境でも、URL はアドレスバーに入っている。
+      // クリップボードが使えない環境では URL そのものを見せる。選んで写せる。
+      if (status) {
+        status.innerHTML = `<span class="share-url">${esc(url)}</span>`
+        status.hidden = false
+      }
     }
   })
 
   wireSearch('here-search', 'here-results', (place) => {
     state.here = place
     saveHere()
-    render()
+    rerender()
   })
   // 宿は「そこにいるうちに」ではなく、いつでも駅から選べる必要がある。
   wireSearch('home-search', 'home-results', (place) => {
     config.home = place
     writeConfig(config)
-    render()
+    rerender()
   })
 }
 
@@ -1148,7 +1262,7 @@ function renderResults(input, listId, onPick) {
   }
 }
 
-function locate() {
+function locate(after = render) {
   const s = t(config.lang)
   const btn = document.querySelector('[data-locate]')
   if (!navigator.geolocation) {
@@ -1161,7 +1275,7 @@ function locate() {
       // 座標のまま持つ。表示名は言語によって変わるので描画のたびに作る。
       state.here = { lat: pos.coords.latitude, lon: pos.coords.longitude, geo: true }
       saveHere()
-      render()
+      after()
     },
     () => {
       if (btn) btn.textContent = s.locationDenied

@@ -76,9 +76,10 @@ const RESUME_MINUTES = 5
  * @property {{lat:number, lon:number, label:string|null}|null} [at]
  *   最も揺れた地点。「どこで止まっているか」を言うのに要る。
  *   東海道新幹線は東京駅を通るが、大阪で止まっていても東京の電車は動く。
- * @property {{label:string, distanceKm:number}|null} [source]
+ * @property {{label:string, distanceKm:number, occurredAt?:string}|null} [source]
  *   その震度を与えた気象庁の観測点と、判定地点からの距離。
  *   推定の根拠なので、内訳を見せるときに要る。
+ *   occurredAt は複数の地震を合成したとき、点検の起点をどこから数えるかに要る。
  */
 
 /**
@@ -210,7 +211,11 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
       level = sample.level
       at = { lat, lon, label: sample.source?.label ?? null }
       source = sample.source
-        ? { label: sample.source.label, distanceKm: sample.source.distanceKm }
+        ? {
+            label: sample.source.label,
+            distanceKm: sample.source.distanceKm,
+            occurredAt: sample.source.occurredAt,
+          }
         : null
     }
   }

@@ -80,6 +80,7 @@ export function buildScenarioEvent(scenario, index) {
         label: area.name,
         pref: area.pref,
         kind: 'area',
+        occurredAt,
       })
     }
   }
@@ -99,6 +100,7 @@ export function buildScenarioEvent(scenario, index) {
       label: station.name,
       pref: station.pref,
       kind: 'station',
+      occurredAt,
     })
   }
 

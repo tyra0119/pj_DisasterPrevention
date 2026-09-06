@@ -16,7 +16,7 @@
 // ビルド工程が無いのでファイル名に版が振れない。ここを上げることが唯一の
 // キャッシュ無効化手段になる。**コードを変えたら必ず上げること。**
 // 上げ忘れると、一度アクセスした利用者に古い画面が出続ける (v1 で実際に起きた)。
-const VERSION = 'v19'
+const VERSION = 'v21'
 const SHELL = `shell-${VERSION}`
 const DATA = `data-${VERSION}`
 
@@ -85,6 +85,8 @@ self.addEventListener('fetch', (event) => {
 
   // 地震情報は必ず取りに行く。古いものを黙って返さない。
   if (url.hostname.endsWith('p2pquake.net') || url.hostname.endsWith('jma.go.jp')) return
+  // 運行情報の中継先も同じ。古い運行情報を返すのは、古い地震を返すのと同じくらい危ない。
+  if (url.hostname.endsWith('workers.dev')) return
 
   // 同一オリジンだけ扱う。
   if (url.origin !== self.location.origin) return

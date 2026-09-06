@@ -156,6 +156,7 @@
       .c-wait { background: var(--c-wait); }
       .c-avoid-rail { background: var(--c-avoid); }
       .c-pending { background: var(--c-delay); }
+      .chip .confirmed { margin-right: .25rem; }
       .c-unset { background: none; color: var(--muted); border: 1px solid var(--line); font-weight: 600; }
 
       ul.lines { list-style: none; margin: 0 0 .8rem; padding: 0; }
@@ -352,10 +353,19 @@
       }
       .dlg-body { padding: .4rem 1rem 1.1rem; }
       .dlg-body label {
-        display: block; margin: .9rem 0 .4rem;
+        display: block; margin: 1.1rem 0 .4rem;
         font-size: .7rem; letter-spacing: .06em; text-transform: uppercase;
         color: var(--muted); font-weight: 600;
       }
+      .dlg-body label.sub { margin-top: .5rem; text-transform: none; letter-spacing: 0; }
+      .dlg-body .value { margin: 0 0 .4rem; font-weight: 600; }
+      .dlg-body .hint { font-size: .8rem; color: var(--muted); margin: 0 0 .5rem; }
+      .dlg-body .field { margin: .3rem 0; }
+      .dlg-body .rowacts { margin: .5rem 0 .2rem; }
+      .dlg-body .hitwrap { margin-top: .3rem; }
+      /* 中身が長いので、ダイアログの中でスクロールさせる。 */
+      dialog#settings .dlg-body { max-height: 70vh; overflow-y: auto; }
+      .share-url { display: block; word-break: break-all; font-size: .74rem; user-select: all; }
 
       /* ── 取得時刻。オフラインかどうかは必ず見える ── */
       .stamp {

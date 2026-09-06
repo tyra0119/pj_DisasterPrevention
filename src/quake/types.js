@@ -54,6 +54,9 @@ export const SHINDO_ORDER = {
  * @property {string} label  観測点名(詳細情報)または細分区域名(速報)。
  * @property {string} pref
  * @property {'station'|'area'} kind  速報の区域代表点は実測地点ではないので区別する。
+ * @property {string} [occurredAt]
+ *   この震度を与えた地震の発生時刻。複数の地震を合成したとき、
+ *   点検の起点をどの地震から数えるかはこれで決まる。
  */
 
 /**

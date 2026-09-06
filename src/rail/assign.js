@@ -116,7 +116,11 @@ export function assignToLines(field, lines, { radiusKm = 20, minLevel } = {}) {
       confidence: best ? 'reported' : sawBelowThreshold ? 'below-threshold' : 'unknown',
       at: best?.point ?? null,
       source: best?.sample.source
-        ? { label: best.sample.source.label, distanceKm: best.sample.source.distanceKm }
+        ? {
+            label: best.sample.source.label,
+            distanceKm: best.sample.source.distanceKm,
+            occurredAt: best.sample.source.occurredAt,
+          }
         : null,
       sampledPoints: line.stations.length + line.track.length,
       unknownPoints,

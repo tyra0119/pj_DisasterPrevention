@@ -63,6 +63,7 @@ export function normalize(raw, index) {
   /** @type {string[]} */
   const unresolved = []
   let sawStation = false
+  const occurredAt = toIso(raw.earthquake.time)
 
   for (const p of raw.points ?? []) {
     const level = scaleToLevel(p.scale)
@@ -81,6 +82,7 @@ export function normalize(raw, index) {
         label: area.name,
         pref: p.pref,
         kind: 'area',
+        occurredAt,
       })
     } else {
       const station = index.byKey.get(stationKey(p.pref, p.addr))
@@ -96,6 +98,7 @@ export function normalize(raw, index) {
         label: station.name,
         pref: station.pref,
         kind: 'station',
+        occurredAt,
       })
     }
   }
@@ -106,7 +109,7 @@ export function normalize(raw, index) {
 
   return {
     id: raw.id,
-    occurredAt: toIso(raw.earthquake.time),
+    occurredAt,
     issuedAt: toIso(raw.issue.time),
     hypocenter: {
       name: h.name,

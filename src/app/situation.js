@@ -96,9 +96,11 @@ export function buildLookup(rail, lineMap) {
  * @param {Map<string, SystemImpact>} systemImpactsById
  * @param {{lineIds?: string[], systemIds?: string[]}} [hint]
  *   空港のように、どの路線・系統で行くかが分かっている場合に渡す。
+ * @param {Map<string, import('./train-info.js').TrainInfo>} [trainInfo]
+ *   事業者の運行情報。あれば推定を上書きする。「平常」なら推定を捨てる。
  * @returns {Situation}
  */
-export function situationAt(place, field, lookup, impactsByLine, systemImpactsById, hint = {}) {
+export function situationAt(place, field, lookup, impactsByLine, systemImpactsById, hint = {}, trainInfo) {
   const here = sampleAt(field, place.lat, place.lon, PLACE_RADIUS_KM)
 
   // 近くの路線。空港のように分かっているなら、それを使う。
@@ -161,6 +163,36 @@ export function situationAt(place, field, lookup, impactsByLine, systemImpactsBy
       suspension: estimateSystemSuspension(systemImpact, field),
       systemId,
     })
+  }
+
+  // 事業者が運行情報を出しているなら、それが推定に勝つ。
+  //
+  // 「平常」と言っているのに「止まっている見込み」と出し続けるのが、
+  // このアプリの一番の弱点だった (推定を終わらせる手段が無かった)。
+  // 「見合わせ」なら推定は裏付けられる。見込みではなく事実として出せる。
+  if (trainInfo) {
+    for (const entry of shown.values()) {
+      const info = entry.systemId ? trainInfo.get(entry.systemId) : null
+      if (!info || info.status === 'unknown') continue
+      entry.confirmed = info.status
+      entry.operatorText = info.text
+      entry.operatorTextEn = info.textEn
+      if (info.status === 'normal') {
+        entry.suspension = {
+          ...entry.suspension,
+          stage: 'none',
+          advice: 'normal',
+          waitMinutes: null,
+          openEnded: false,
+          uncertain: false,
+        }
+      } else if (info.status === 'delayed' && entry.suspension.advice === 'normal') {
+        entry.suspension = { ...entry.suspension, stage: 'caution', advice: 'delay' }
+      } else if (info.status === 'stopped' && entry.suspension.advice === 'normal') {
+        // 推定では揺れていないが、事業者は止めている。理由は分からないが事実は事実。
+        entry.suspension = { ...entry.suspension, stage: 'walk-inspection', advice: 'wait' }
+      }
+    }
   }
 
   const lines = [...shown.values()].sort((a, b) => rank(b.suspension) - rank(a.suspension))
