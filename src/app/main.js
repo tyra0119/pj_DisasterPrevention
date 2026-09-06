@@ -439,7 +439,13 @@ function lineList(sit, lang) {
     .map((l) => {
       const name = pick(l.title, l.titleEn, lang)
       const advice = l.suspension.advice
-      return `<li><span class="ln">${esc(name)}</span><span class="chip c-${advice}">${esc(t(lang)[CHIP_KEY[advice]])}</span></li>`
+      // 遠くで止まっている路線は、どこで止まっているかを添える。
+      // 東海道新幹線は東京駅を通るが、大阪で止まっていても東京の電車は動く。
+      const where =
+        !l.nearby && l.suspension.at?.label
+          ? `<span class="ln-where">${esc(t(lang).stoppedAt(l.suspension.at.label))}</span>`
+          : ''
+      return `<li><span class="ln">${esc(name)}${where}</span><span class="chip c-${advice}">${esc(t(lang)[CHIP_KEY[advice]])}</span></li>`
     })
     .join('')
 }

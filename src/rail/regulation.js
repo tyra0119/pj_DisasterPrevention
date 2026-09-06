@@ -73,6 +73,9 @@ const RESUME_MINUTES = 5
  *   運転再開までの目安 (分)。openEnded のときは null。
  * @property {boolean} openEnded  点検モデルでは説明できない (被害が出る領域)。
  * @property {boolean} uncertain  震度の根拠が弱い。結論を弱める材料。
+ * @property {{lat:number, lon:number, label:string|null}|null} [at]
+ *   最も揺れた地点。「どこで止まっているか」を言うのに要る。
+ *   東海道新幹線は東京駅を通るが、大阪で止まっていても東京の電車は動く。
  */
 
 /**
@@ -100,7 +103,10 @@ export function inspectionLengthKm(impact) {
  */
 export function estimateSuspension(impact) {
   const uncertain = impact.confidence !== 'reported' || impact.unknownPoints > 0
-  return estimateFromLevel(impact.level, inspectionLengthKm(impact), uncertain)
+  return {
+    ...estimateFromLevel(impact.level, inspectionLengthKm(impact), uncertain),
+    at: impact.at ? { lat: impact.at.lat, lon: impact.at.lon, label: impact.at.label ?? null } : null,
+  }
 }
 
 // ── 運転系統としての見積もり ────────────────────────────────
@@ -179,11 +185,13 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
     return { ...worstOfLines(systemImpact), systemLengthKm: null, corridorKnown: false }
   }
 
-  // 系統の駅で震度を取り直す。
+  // 系統の駅で震度を取り直す。どこが一番揺れたかも覚えておく。
   /** @type {import('../quake/types.js').ShindoLevel|null} */
   let level = null
   let confidence = 'unknown'
   let unknownPoints = 0
+  /** @type {{lat:number, lon:number, label:string|null}|null} */
+  let at = null
   for (const [lat, lon] of geo) {
     const sample = sampleAt(field, lat, lon, radiusKm)
     if (sample.confidence === 'unknown') unknownPoints++
@@ -192,7 +200,10 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
     }
     if (!sample.level) continue
     confidence = 'reported'
-    if (!level || SHINDO_ORDER[sample.level] > SHINDO_ORDER[level]) level = sample.level
+    if (!level || SHINDO_ORDER[sample.level] > SHINDO_ORDER[level]) {
+      level = sample.level
+      at = { lat, lon, label: sample.source?.label ?? null }
+    }
   }
 
   // 系統が走っている区間の長さと、そのうち震度5弱以上だった長さ。
@@ -232,7 +243,12 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
   // 信用できないときは路線側の見積もり (安全側) に倒す。
   if (systemLengthKm < spanKm(geo)) {
     const worst = worstOfLines(systemImpact)
-    return { ...worst, systemLengthKm: Number(systemLengthKm.toFixed(1)), corridorKnown: false }
+    return {
+      ...worst,
+      at: worst.at ?? at,
+      systemLengthKm: Number(systemLengthKm.toFixed(1)),
+      corridorKnown: false,
+    }
   }
 
   const base = estimateFromLevel(
@@ -243,6 +259,7 @@ export function estimateSystemSuspension(systemImpact, field, { radiusKm = 20 } 
   )
   return {
     ...base,
+    at,
     systemLengthKm: Number(systemLengthKm.toFixed(1)),
     corridorKnown: true,
   }

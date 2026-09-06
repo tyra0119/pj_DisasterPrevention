@@ -35,11 +35,25 @@ const NEARBY_LINE_KM = 2
 const SYSTEM_HERE_KM = 5
 
 /**
+ * その路線の揺れが「この場所の話」と言える距離。
+ *
+ * 東海道新幹線は東京駅を通るが、大阪で震度6弱を観測しても
+ * 東京の電車が止まるわけではない。路線の最大震度をそのまま
+ * 場所の判定にすると、400km 先の揺れで「不通」と出てしまう。
+ *
+ * 路線の中で最も揺れた地点がここから離れているなら、
+ * その路線は一覧には出すが、この場所の判定には使わない。
+ */
+const LOCAL_KM = 50
+
+/**
  * @typedef {object} Situation
  * @property {import('../quake/types.js').ShindoLevel|null} level  その場所の揺れ。
  * @property {import('../quake/field.js').Confidence} confidence
  * @property {Suspension} worst  近くの路線のうち最も重い見込み。判断 (待つ/動く) はこれで決める。
  * @property {Suspension} typical  近くの路線の中央値。待ち時間の見出しはこれで出す。
+ * @property {Array<{title:string, titleEn:string|null, suspension:Suspension, systemId:string|null}>} local
+ *   そのうち、揺れた地点がこの場所の近く (50km 以内) のもの。判定はこれで決める。
  * @property {Array<{title:string, titleEn:string|null, suspension:Suspension, systemId:string|null}>} lines
  *   乗客に見せる単位。運転系統があれば系統名、無ければ N02 の路線名。
  */
@@ -157,19 +171,27 @@ export function situationAt(place, field, lookup, impactsByLine, systemImpactsBy
     uncertain: here.confidence !== 'reported',
   }
 
+  // この場所の判定に使う路線。遠くで揺れているだけのものは外す。
+  // 外したものも一覧には出す。ただし「どこで止まっているか」を添えて、
+  // 判定が平常なのに一覧に不通が並ぶ理由が分かるようにする。
+  for (const l of lines) {
+    l.nearby =
+      !l.suspension.at ||
+      haversine(place.lat, place.lon, l.suspension.at.lat, l.suspension.at.lon) <= LOCAL_KM
+  }
+  const local = lines.filter((l) => l.nearby)
+
   // 判断は最も重い路線に合わせる。1 本でも止まっていれば経路は崩れる。
-  const worst = lines[0]?.suspension ?? none
+  const worst = local[0]?.suspension ?? none
 
   // 待ち時間の見出しは中央値にする。東京駅には東北新幹線も来ていて、
   // 全長の点検で 10 時間と出る。それを見出しにすると、
   // 地下鉄で数駅戻るだけの人にまで「10 時間」と言うことになる。
   // どの路線がどれだけかは一覧で見せる。
-  const waiting = lines.filter((l) => l.suspension.waitMinutes)
-  const typical = waiting.length
-    ? waiting[Math.floor(waiting.length / 2)].suspension
-    : worst
+  const waiting = local.filter((l) => l.suspension.waitMinutes)
+  const typical = waiting.length ? waiting[Math.floor(waiting.length / 2)].suspension : worst
 
-  return { level: here.level, confidence: here.confidence, worst, typical, lines }
+  return { level: here.level, confidence: here.confidence, worst, typical, lines, local }
 }
 
 /** 重い順に並べるための順位。見通し不明が一番重い。 */
