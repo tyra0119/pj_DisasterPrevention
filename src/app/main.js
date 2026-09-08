@@ -1041,6 +1041,8 @@ function settingsDialog(lang) {
       <label>${esc(s.shareLabel)}</label>
       <div class="rowacts"><button class="pill" data-share="1">${esc(s.share)}</button></div>
       <p class="hint share-status" id="share-status" hidden></p>
+
+      <p class="hint"><a href="manual.html?lang=${esc(lang)}">${esc(s.manual)}</a></p>
     </div>
   </dialog>`
 }
@@ -1104,6 +1106,7 @@ function render() {
       <p>${esc(s.caveat)}</p>
       <p class="src">${esc(s.sources)}: 気象庁 / P2P地震情報 / 国土数値情報（鉄道データ）CC BY 4.0 / <a href="https://www.odpt.org/" rel="noopener">公共交通オープンデータセンター</a> / 国土地理院（指定緊急避難場所・地理院タイル・逆ジオコーダ） / 東京都オープンデータカタログ（一時滞在施設）CC BY 4.0 / 高浜・翠川 (2011) 日本地震工学会論文集 11(2)</p>
       <p class="src">${esc(s.odptCredit)}</p>
+      <p class="src"><a href="manual.html?lang=${esc(lang)}">${esc(s.manual)}</a></p>
       <p class="src"><a href="test.html">test</a> · <a href="diagnostics.html">diagnostics</a></p>
     </section>`
   wire()

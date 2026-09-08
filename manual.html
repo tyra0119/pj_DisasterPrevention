@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1117" />
+    <base href="./" />
+    <title>Move or Wait — How to use</title>
+    <meta
+      name="description"
+      content="How to use Move or Wait: what the coloured verdict means, how to read the estimated wait, and what to set up before an earthquake."
+    />
+    <style>
+      /* 画面 (index.html) と同じ色と字。マニュアルだけ別の見た目にすると、
+         画面で見た帯とここに並ぶ帯が同じものだと分からなくなる。 */
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #14181d;
+        --muted: #5f6b78;
+        --line: #e3e7eb;
+        --panel: #f5f7f9;
+
+        --c-normal: #0b6b3a;
+        --c-delay: #9a5b06;
+        --c-wait: #a4231c;
+        --c-avoid: #5a1016;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d1117;
+          --fg: #e9eef4;
+          --muted: #9aa6b2;
+          --line: #242c36;
+          --panel: #161d26;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.65 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      #doc { max-width: 34rem; margin-inline: auto; padding: 0 1rem 4rem; }
+
+      a { color: inherit; text-underline-offset: .2em; }
+
+      /* ── 見出し ── */
+      .top {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 1rem; padding: .9rem 0 .5rem;
+      }
+      .brand h1 { font-size: .95rem; margin: 0; letter-spacing: -.01em; }
+      .brand p { margin: 0; color: var(--muted); font-size: .72rem; }
+      .langs { display: flex; gap: .3rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+      .pill {
+        background: none; border: 1px solid var(--line); color: var(--fg);
+        padding: .25rem .5rem; font: inherit; font-size: .72rem;
+        border-radius: .4rem; cursor: pointer;
+      }
+      .pill.on { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+
+      .lede { margin: .2rem 0 1.4rem; }
+      .lede h2 {
+        font-size: clamp(1.5rem, 6.5vw, 1.9rem); font-weight: 800;
+        line-height: 1.15; letter-spacing: -.02em; margin: .4rem 0 .5rem;
+      }
+      .lede p { margin: 0; color: var(--muted); font-size: .92rem; }
+      .openapp {
+        display: inline-block; margin-top: 1rem;
+        background: var(--fg); color: var(--bg); text-decoration: none;
+        padding: .6rem 1rem; font-weight: 600; border-radius: .5rem; font-size: .9rem;
+      }
+
+      /* ── 目次 ── */
+      nav.toc {
+        border: 1px solid var(--line); border-radius: .7rem;
+        padding: .8rem .9rem; margin-bottom: 2rem; background: var(--panel);
+      }
+      nav.toc ol { margin: 0; padding-left: 1.2rem; font-size: .88rem; }
+      nav.toc li { margin: .2rem 0; }
+
+      /* ── 本文 ── */
+      section { margin-bottom: 2.4rem; scroll-margin-top: 1rem; }
+      h2 {
+        font-size: 1.15rem; letter-spacing: -.01em; margin: 0 0 .6rem;
+        padding-bottom: .35rem; border-bottom: 2px solid var(--fg);
+      }
+      p { margin: 0 0 .8rem; }
+      ul, ol { margin: 0 0 .9rem; padding-left: 1.3rem; }
+      li { margin: .3rem 0; }
+      strong { font-weight: 700; }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .85em; background: var(--panel);
+        padding: .1rem .3rem; border-radius: .25rem;
+      }
+
+      .note {
+        border-left: 3px solid var(--c-delay);
+        padding: .5rem 0 .5rem .8rem; margin: 0 0 .9rem;
+        font-size: .92rem; color: var(--muted);
+      }
+      .note strong { color: var(--fg); }
+
+      /* ── 判定帯の見本。画面に出るものと同じ形 ── */
+      .band {
+        border-radius: .7rem; padding: .7rem .85rem .8rem;
+        color: #fff; margin-bottom: .55rem;
+      }
+      .v-normal { background: var(--c-normal); }
+      .v-delay { background: var(--c-delay); }
+      .v-wait { background: var(--c-wait); }
+      .v-avoid-rail { background: var(--c-avoid); }
+      .band strong { display: block; font-size: 1.02rem; font-weight: 800; letter-spacing: -.01em; }
+      .band span { display: block; font-size: .82rem; opacity: .92; margin-top: .15rem; }
+      .band em {
+        display: block; font-style: normal; font-size: .82rem; font-weight: 600;
+        margin: .5rem -.2rem -.2rem; padding: .4rem .55rem;
+        background: rgba(255, 255, 255, .2); border-radius: .4rem;
+      }
+
+      /* ── 印 (チップ) ── */
+      .chiplist { list-style: none; padding: 0; }
+      .chiplist li {
+        display: grid; grid-template-columns: 4.5rem 1fr; gap: .6rem;
+        align-items: baseline; margin: .45rem 0; font-size: .9rem;
+      }
+      .chip {
+        justify-self: start; color: #fff; font-size: .72rem; font-weight: 700;
+        padding: .1rem .5rem; border-radius: 999px; white-space: nowrap;
+      }
+      .c-normal { background: var(--c-normal); }
+      .c-delay { background: var(--c-delay); }
+      .c-wait { background: var(--c-wait); }
+      .c-avoid-rail { background: var(--c-avoid); }
+      .c-unknown { background: var(--muted); }
+
+      /* ── 手順 ── */
+      ol.steps { list-style: none; padding: 0; counter-reset: s; }
+      ol.steps li {
+        counter-increment: s; position: relative;
+        padding-left: 2rem; margin: .7rem 0;
+      }
+      ol.steps li::before {
+        content: counter(s); position: absolute; left: 0; top: .1rem;
+        width: 1.4rem; height: 1.4rem; border-radius: 50%;
+        background: var(--fg); color: var(--bg);
+        font-size: .78rem; font-weight: 700;
+        display: grid; place-items: center;
+      }
+      ol.steps strong { display: block; }
+      ol.steps span { display: block; font-size: .88rem; color: var(--muted); }
+
+      /* ── 表 ── */
+      .tablewrap { overflow-x: auto; margin: 0 0 .9rem; }
+      table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+      th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { color: var(--muted); font-size: .78rem; font-weight: 600; white-space: nowrap; }
+      /* 震度のように短い見出し列は折らない。「6弱以/上」と切れると読みにくい。 */
+      table.narrow td:first-child { white-space: nowrap; font-weight: 600; }
+
+      /* ── よくある質問 ── */
+      dl { margin: 0; }
+      dt { font-weight: 700; margin-top: .9rem; }
+      dd { margin: .15rem 0 0; color: var(--muted); }
+
+      /* ── 試す ── */
+      ul.trylist { list-style: none; padding: 0; }
+      ul.trylist li {
+        border: 1px solid var(--line); border-radius: .6rem;
+        padding: .6rem .75rem; margin: .5rem 0;
+      }
+      ul.trylist a { font-weight: 600; }
+      ul.trylist span { display: block; font-size: .84rem; color: var(--muted); margin-top: .1rem; }
+
+      footer {
+        border-top: 1px solid var(--line); padding-top: 1rem;
+        font-size: .74rem; color: var(--muted);
+      }
+      footer p { margin: 0 0 .4rem; }
+    </style>
+  </head>
+  <body>
+    <main id="doc"></main>
+
+    <script type="module">
+      // マニュアル。画面 (index.html) と同じ 4 言語で、同じ言い回しを使う。
+      //
+      // 本文をここに直接置くのは、アプリの i18n と用語がずれたときに
+      // 気づけるようにするため。画面の文言を変えたらここも直す。
+      //
+      // 依存なし・ビルドなし。1 ファイルで完結させ、Service Worker で
+      // 端末に残す。**回線が細るときにこそ読まれる文書なので、
+      // オンラインでしか読めないマニュアルには意味がない。**
+
+      const LANGS = [
+        { code: 'ja', label: '日本語' },
+        { code: 'en', label: 'EN' },
+        { code: 'zh', label: '中文' },
+        { code: 'ko', label: '한국어' },
+      ]
+
+      const SHINJUKU = { ja: '新宿', en: 'Shinjuku', zh: '新宿', ko: '신주쿠' }
+      const DEMO = (l) =>
+        `index.html?lang=${l}&scenario=tokyo-5minus&home=35.6885,139.6990&homeName=${encodeURIComponent(SHINJUKU[l])}&flight=NRT`
+      // 宿の名札はそのまま画面に出るので、言語に合わせる。
+      const TOKYO = { ja: '東京', en: 'Tokyo', zh: '东京', ko: '도쿄' }
+      const home = (l) => `home=35.6812,139.7671&homeName=${encodeURIComponent(TOKYO[l])}`
+      const SIX = (l) => `index.html?lang=${l}&scenario=tokyo-6plus&${home(l)}&flight=NRT`
+      const PROMPT = (l) => `index.html?lang=${l}&scenario=tokyo-5minus-prompt`
+      const REAL = (l) => `index.html?lang=${l}&event=6a89d870e88ee598246bf24d&${home(l)}&flight=HND`
+
+      const CONTENT = {
+        // ── 日本語 ────────────────────────────────────────────
+        ja: {
+          docTitle: '使い方 — 動くか、待つか',
+          appName: '動くか、待つか',
+          tagline: '地震のあと、日本の電車は動くか',
+          title: '使い方',
+          lede: '地震のあと、待つのか、今夜の寝場所を確保するのか。この画面の読み方。',
+          openApp: 'アプリを開く',
+          toc: '目次',
+          sections: [
+            {
+              id: 'what',
+              h: 'これは何をするアプリか',
+              blocks: [
+                { p: '大きな地震のあと、鉄道会社の案内はどこも同じ文になります。「安全確認のため運転を見合わせています。運転再開の見込みは立っていません。」' },
+                { p: '意地悪をしているのではありません。点検の内容で復旧時間が大きく変わるので、正確な数字が出せないのです。ただ、待っている側は困ります。**あと1時間なら待てる。あと6時間なら宿を取る。**その判断ができません。' },
+                { p: 'このアプリは、その空白に数字を入れます。答えるのはひとつだけです。' },
+                { note: '**待つか、今夜の寝場所を確保するかを、いま決められるようにする。**' },
+                { p: '震度は前面に出しません。「震度5弱」と言われても、それが自分にとって何を意味するかは分からないからです。代わりに「止まっている見込み・再開まで◯時間」と出します。' },
+              ],
+            },
+            {
+              id: 'before',
+              h: '地震の前に、1分だけ',
+              blocks: [
+                { p: '地震が起きてから設定するのでは遅すぎます。**日本に着いた日に、一度開いて設定してください。**' },
+                {
+                  steps: [
+                    ['右上の「設定」を開く', ''],
+                    ['いまいる場所', '位置情報を許可するか、駅を検索します。許可すると住所で表示されるので、言葉が通じないとき、駅員やタクシーに画面を見せれば伝わります。'],
+                    ['宿', '泊まっている場所の近くの駅を検索します。いまそこにいる必要はありません。'],
+                    ['出国便', '空港と出発時刻を入れると、鉄道で間に合うかまで出します。'],
+                    ['言語', '日本語 / EN / 中文 / 한국어。'],
+                    ['「設定つきリンクをコピー」', '設定は URL に入ります。保存しておけば別の端末でも同じ設定で開けますし、同行者にもそのまま渡せます。'],
+                  ],
+                },
+                { note: '**一度開いておくと、圏外でも使えます。**観測点・路線・避難場所のデータが端末に残るためです。地震のあとは回線が細ります。' },
+              ],
+            },
+            {
+              id: 'verdict',
+              h: '画面の読み方 — 一番上の色帯',
+              blocks: [
+                { p: '色帯だけ読めば、動くか待つかは分かります。下に並ぶのは、実際に出る6種類です。' },
+                {
+                  bands: [
+                    ['v-normal', '平常どおり', '電車を止めるほどの地震は起きていません。', 'そのまま移動して大丈夫。'],
+                    ['v-delay', '遅れている見込み', '線路を確認しながら、徐行で動いています。', '電車は動いています。時間に余裕を持って。'],
+                    ['v-delay', '強い揺れを観測 — 詳細を待っています', '速報段階。まだ観測点ごとの震度が届いていません。', 'まず動かず、安全を確保してください。'],
+                    ['v-wait', '止まっている見込み', '再開の前に、鉄道会社が線路を点検しています。', '再開までの幅が出ます。今夜戻れるかで判断してください。'],
+                    ['v-delay', '再開しているかもしれません', '推定した点検時間は過ぎました。', '駅の案内か運行情報で確認してから動いてください。'],
+                    ['v-avoid-rail', '鉄道は使えない見込み', '被害が出ている可能性。復旧に日単位かかることがあります。', '今夜泊まれる場所を探す。駅で待たないこと。'],
+                  ],
+                },
+                { note: '琥珀色が2つあるのは、どちらも「まだ分からない」からです。速報段階を緑（平常）にはしません。' },
+              ],
+            },
+            {
+              id: 'eta',
+              h: '「再開まで」の幅の読み方',
+              blocks: [
+                { p: 'こう出ます。' },
+                { note: '再開まで 51分–4時間26分 · 12:24〜15:59 ごろ' },
+                { p: '幅があるのは、正確な時刻が分からないからです。点検の結果次第で変わります。**遅い方（この例では 15:59）で考えてください。**' },
+                { p: '15:59 に再開して、その日のうちに宿へ戻れるか。戻れないなら、いま寝場所を確保する方が確実です。地震のあと、駅の近くのホテルは数時間で埋まります。' },
+                { p: '「あと4時間26分」だけでなく時刻も出すのは、ストレスの中で引き算をさせないためです。' },
+              ],
+            },
+            {
+              id: 'places',
+              h: '場所の行と、路線の内訳',
+              blocks: [
+                { p: '色帯の下に、いまいる場所・宿・出国便が1行ずつ並びます。右の印が、その場所の周りの電車の状態です。' },
+                {
+                  chips: [
+                    ['c-normal', '平常', '動いています。'],
+                    ['c-delay', '遅れ', '徐行。動きますが遅れます。'],
+                    ['c-wait', '停止', '点検中。再開までの見込みが出ます。'],
+                    ['c-avoid-rail', '不通', '被害の可能性。日単位になりえます。'],
+                    ['c-delay', '速報', 'まだ詳しい震度が届いていません。'],
+                    ['c-delay', '要確認', '推定した点検時間を過ぎました。'],
+                    ['c-unknown', '不明', '近くに観測点がありません。'],
+                  ],
+                },
+                { p: '行をタップすると、その周りの路線が1行ずつ開きます。さらに路線の「+」を押すと、なぜその判定なのかが見えます。' },
+                {
+                  ul: [
+                    '**線内で最も強い揺れ** — どの気象庁観測点で震度いくつだったか',
+                    '**点検が要る区間** — 何 km を歩いて点検することになるか',
+                    '**再開まで** — その区間の長さから出した幅',
+                    '**対応する線路** — 元になった国土数値情報の線路名称',
+                    '**鉄道会社の案内** — 運行情報が取れていれば、その文面と時点',
+                  ],
+                },
+                { note: '印に **✓** が付いていたら、鉄道会社の運行情報で裏が取れています。推定ではなく事実です。逆に会社が「平常」と言っていれば、推定は取り下げて平常に戻します。' },
+              ],
+            },
+            {
+              id: 'flight',
+              h: '出国便',
+              blocks: [
+                { p: '空港と出発時刻を設定してあると、鉄道で間に合うかまで出します。' },
+                {
+                  ul: [
+                    '間に合う見込みですが、予定より早めに出てください',
+                    'かなり厳しい。いま動くか、便の変更を検討してください',
+                    '鉄道では間に合わない見込み。航空会社に連絡を',
+                  ],
+                },
+                { note: '鉄道が駄目でも、空港バスやタクシーは動いていることがあります。' },
+              ],
+            },
+            {
+              id: 'shelter',
+              h: '休める場所と、逃げる場所',
+              blocks: [
+                { p: '画面に出る2種類は、用途がまったく違います。取り違えないでください。' },
+                {
+                  table: {
+                    head: ['', '何のための場所か'],
+                    rows: [
+                      ['帰れないときに休める場所', '帰宅困難者のために開放される施設（一時滞在施設）。ここまで来れば、電車が動くまで座って待てます。'],
+                      ['危険から逃げる場所', '建物が危ないときや火災から逃げるときに向かう場所（指定緊急避難場所）。市区町村が指定しています。'],
+                    ],
+                  },
+                },
+                { note: '**いま安全な建物の中にいるなら、まず動かないこと。**日本では地震のあと、一斉に移動しないよう求められています。' },
+                { p: 'その施設がいま開設されているかどうかまでは分かりません。公開されている情報がないためです。休める場所（一時滞在施設）は、いまのところ東京都の公開分だけを収録しています。載っていない地域は「近くに無い」という意味ではありません。' },
+              ],
+            },
+            {
+              id: 'map',
+              h: '地図',
+              blocks: [
+                {
+                  ul: [
+                    '**+ / −** — 拡大・縮小',
+                    '**◎** — 現在地に戻す',
+                    'ドラッグで動かせます',
+                    '**「経路を開く」** — 端末の地図アプリで道順を出します',
+                  ],
+                },
+                { p: '青い番号が休める場所、緑の記号が逃げる場所です。震源も別の地図で見られます。' },
+              ],
+            },
+            {
+              id: 'basis',
+              h: 'この数字はどこから来るか',
+              blocks: [
+                { p: '再開までの時間は、既往研究の推定式から出しています。' },
+                { note: '高浜勉・翠川三郎「地震時の鉄道運休時間の推定方法」日本地震工学会論文集 第11巻第2号 (2011)。首都圏の鉄道事業者24社への聞き取りが元になっています。' },
+                {
+                  table: {
+                    head: ['震度', '点検', '再開まで'],
+                      narrow: true,
+                    rows: [
+                      ['4', '注意運転点検・重要箇所の点検', '30分 + 5分'],
+                      ['5弱・5強', '徒歩点検', '1kmあたり6.0分（最低30分）± 30分 + 5分'],
+                      ['6弱以上', '被害が出る領域。点検だけでは終わらない', '時間を出しません'],
+                    ],
+                  },
+                },
+                { p: '点検区間の長さは、震度5弱以上が当たった区間だけを数えています。その測り方の誤差（±40%）と、式そのもののばらつき（±30分）を重ねたものが、画面に出る幅です。' },
+                { p: '**限界があります。鉄道会社は気象庁の震度で判断していません。**各社は沿線に置いた自前の地震計の値で規制をかけます。ここで使う震度は、最大20km離れた気象庁の観測点の値で、代理指標にすぎません。' },
+                { p: 'だから幅で出し、断定せず、運行情報が「平常」と言えば推定を捨てます。**動く前に、必ず駅係員か鉄道会社に確認してください。**' },
+              ],
+            },
+            {
+              id: 'offline',
+              h: '圏外のとき',
+              blocks: [
+                { p: '一度開いていれば、観測点・路線・避難場所のデータは端末に残っています。地震情報だけは必ず取りに行くので、取れなければ最後に取れた内容を「オフライン」と付けて表示します。' },
+                { note: '画面の下に**最終取得**の時刻が必ず出ます。古い情報で判断しないよう、そこを見てください。' },
+              ],
+            },
+            {
+              id: 'try',
+              h: '試してみる',
+              blocks: [
+                { p: '地震が起きていない日は「平常どおり」しか出ません。作り物のデータで、実際の動きを見られます。画面の上に赤い「テストデータ」の帯が出るので、本物と混ざることはありません。' },
+                {
+                  links: [
+                    ['震度5弱 — 止まっている見込み', DEMO, '中心になる画面。再開までの幅と、今夜戻れるかの判断。'],
+                    ['震度6強 — 鉄道は使えない見込み', SIX, '待たずに宿を取る判断と、休める場所の地図。'],
+                    ['速報段階（発生3分後）', PROMPT, 'まだ詳しい震度が届いていない状態。'],
+                    ['実際の地震（2026-08-23 茨城県南部 M5.9）', REAL, 'テストではなく実データ。この日の推定はどうだったか。'],
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'faq',
+              h: 'よくある質問',
+              blocks: [
+                {
+                  qa: [
+                    ['位置情報を許可しないと使えませんか。', '使えます。設定で駅を検索してください。宿と出国便だけでも判断はできます。'],
+                    ['通知は来ますか。', '来ません。地震のあとに自分で開く前提です。だから設定つきリンクを保存しておいてください。'],
+                    ['登録やログインは要りますか。', 'ありません。設定は端末と URL にだけ残ります。'],
+                    ['なぜ震度を大きく出さないのですか。', '震度そのものは判断材料にならないからです。必要なら路線の内訳に出ています。'],
+                    ['新幹線や飛行機は分かりますか。', '新幹線は路線として出ます。飛行機の遅延・欠航は出せません。航空会社に確認してください。'],
+                    ['この見込みは当たりますか。', '幅で出しています。実際の再開は点検の結果次第です。鉄道会社の運行情報が取れれば、それで上書きします。'],
+                  ],
+                },
+              ],
+            },
+          ],
+          sourcesLabel: '出典',
+          sources:
+            '気象庁 / P2P地震情報 / 国土数値情報（鉄道データ）CC BY 4.0 / 公共交通オープンデータセンター / 国土地理院（指定緊急避難場所・地理院タイル・逆ジオコーダ） / 東京都オープンデータカタログ（一時滞在施設）CC BY 4.0 / 高浜・翠川 (2011) 日本地震工学会論文集 11(2)',
+          disclaimer:
+            'これは推定です。鉄道会社は自前の沿線地震計で判断していて、ここで使っている数値とは別物です。動く前に必ず事業者か駅係員に確認してください。',
+        },
+
+        // ── English ───────────────────────────────────────────
+        en: {
+          docTitle: 'How to use — Move or Wait',
+          appName: 'Move or Wait',
+          tagline: 'Trains in Japan after an earthquake',
+          title: 'How to use',
+          lede: 'After an earthquake: wait, or find a bed for tonight? How to read this screen.',
+          openApp: 'Open the app',
+          toc: 'Contents',
+          sections: [
+            {
+              id: 'what',
+              h: 'What this app does',
+              blocks: [
+                { p: 'After a large earthquake, every railway in Japan says the same thing: "Service is suspended for safety checks. There is no estimate for when it will resume."' },
+                { p: 'They are not withholding it. Inspection times vary so much that no accurate figure exists. But that leaves you stuck. **One more hour, and you wait. Six more hours, and you book a room.** You cannot tell which.' },
+                { p: 'This app fills that gap with a number. It answers one question.' },
+                { note: '**Should you wait, or secure a place to sleep tonight — decided now.**' },
+                { p: 'It does not lead with the seismic intensity. Being told "JMA intensity 5-" does not tell you what it means for you. It tells you "likely stopped — back in about N hours" instead.' },
+              ],
+            },
+            {
+              id: 'before',
+              h: 'One minute, before an earthquake',
+              blocks: [
+                { p: 'Setting this up after the shaking starts is too late. **Open it once on the day you arrive in Japan.**' },
+                {
+                  steps: [
+                    ['Open "Settings" (top right)', ''],
+                    ['Where you are', 'Allow location, or search for a station. With location on, it shows a street address — so if language fails, you can show the screen to station staff or a taxi driver.'],
+                    ['Your accommodation', 'Search for a station near where you are staying. You do not need to be there.'],
+                    ['Your flight', 'Enter the airport and departure time, and it will tell you whether the trains can still get you there.'],
+                    ['Language', 'English / 日本語 / 中文 / 한국어.'],
+                    ['"Copy link with settings"', 'Your settings live in the URL. Save it and you can open the same setup on another device, or hand it to the people travelling with you.'],
+                  ],
+                },
+                { note: '**Open it once and it works offline too.** The station, railway and shelter data stay on your device. Networks get congested after an earthquake.' },
+              ],
+            },
+            {
+              id: 'verdict',
+              h: 'Reading the screen — the coloured band',
+              blocks: [
+                { p: 'The band at the top is enough to decide. These are the six you will see.' },
+                {
+                  bands: [
+                    ['v-normal', 'RUNNING NORMALLY', 'No earthquake strong enough to stop the trains.', 'Travel as planned.'],
+                    ['v-delay', 'LIKELY DELAYED', 'Trains are running slowly while the track is checked.', 'Trains are moving. Allow extra time.'],
+                    ['v-delay', 'STRONG SHAKING — WAITING FOR DETAILS', 'First report only. Per-station intensities have not arrived yet.', 'Do not move yet. Get yourself safe.'],
+                    ['v-wait', 'LIKELY STOPPED', 'Railways are inspecting the track before restarting.', 'You get a time range. Decide by whether you can still get back tonight.'],
+                    ['v-delay', 'MAY HAVE RESUMED', 'The estimated inspection time has passed.', 'Check with the station or the operator before you move.'],
+                    ['v-avoid-rail', 'RAIL LIKELY UNUSABLE', 'Damage is likely. Services can be out for days.', 'Find somewhere to stay tonight. Do not wait at the station.'],
+                  ],
+                },
+                { note: 'Two of them are amber because both mean "not known yet". The first-report stage is never shown in green.' },
+              ],
+            },
+            {
+              id: 'eta',
+              h: 'Reading the time range',
+              blocks: [
+                { p: 'It looks like this.' },
+                { note: 'Service back in 51 min–4 h 26 min · around 12:24–15:59' },
+                { p: 'It is a range because the exact time is not knowable — it depends on what the inspection finds. **Plan on the later end (15:59 in this example).**' },
+                { p: 'If service returns at 15:59, can you still get back to your accommodation today? If not, securing a bed now is the safer move. Hotels near stations fill up within hours of an earthquake.' },
+                { p: 'It shows clock times as well as "4 h 26 min" so that you never have to do arithmetic under stress.' },
+              ],
+            },
+            {
+              id: 'places',
+              h: 'Your places, and the lines behind them',
+              blocks: [
+                { p: 'Below the band, one row each for where you are, your accommodation and your flight. The tag on the right is the state of the trains around that place.' },
+                {
+                  chips: [
+                    ['c-normal', 'Normal', 'Running.'],
+                    ['c-delay', 'Delayed', 'Running slowly.'],
+                    ['c-wait', 'Stopped', 'Under inspection. A time range is shown.'],
+                    ['c-avoid-rail', 'No trains', 'Damage likely. Can last days.'],
+                    ['c-delay', 'First report', 'Detailed intensities not in yet.'],
+                    ['c-delay', 'Check', 'The estimated inspection time has passed.'],
+                    ['c-unknown', 'Unknown', 'No observation point nearby.'],
+                  ],
+                },
+                { p: 'Tap a row to list the lines around that place. Tap "+" on a line to see why it was judged that way.' },
+                {
+                  ul: [
+                    '**Strongest shaking on the line** — which JMA observation point, and what intensity',
+                    '**Section needing inspection** — how many km have to be walked',
+                    '**Back in** — the range derived from that length',
+                    '**Track sections used** — the underlying national railway dataset names',
+                    '**Operator says** — the railway\'s own status text, and when it was issued',
+                  ],
+                },
+                { note: 'A **✓** on the tag means the railway\'s own status confirms it — that is fact, not estimate. And if the operator says "normal", the estimate is dropped in favour of what they say.' },
+              ],
+            },
+            {
+              id: 'flight',
+              h: 'Your flight',
+              blocks: [
+                { p: 'With an airport and departure time set, it also tells you whether the trains can still get you there.' },
+                {
+                  ul: [
+                    'You should still make it, but leave earlier than planned',
+                    'Very tight. Move now, or look at changing the flight',
+                    'You are unlikely to make it by train. Contact your airline',
+                  ],
+                },
+                { note: 'Even when the trains are down, airport buses and taxis are often still running.' },
+              ],
+            },
+            {
+              id: 'shelter',
+              h: 'Somewhere to rest, and somewhere to escape to',
+              blocks: [
+                { p: 'The two kinds shown on the screen are for completely different situations. Do not confuse them.' },
+                {
+                  table: {
+                    head: ['', 'What it is for'],
+                    rows: [
+                      ['Where you can rest if stranded', 'Facilities opened for people who cannot get home. You can sit and wait here until the trains run again.'],
+                      ['Where to escape danger', 'Where to go if your building is unsafe or you need to escape a fire. Designated by the city.'],
+                    ],
+                  },
+                },
+                { note: '**If you are in a safe building, stay put first.** Japan asks people not to all move at once after a quake.' },
+                { p: 'Whether a given facility is actually open is not published anywhere, so it cannot be shown. Places to rest are currently only listed for Tokyo. If your area is blank, that does not mean there is nothing near you.' },
+              ],
+            },
+            {
+              id: 'map',
+              h: 'The map',
+              blocks: [
+                {
+                  ul: [
+                    '**+ / −** — zoom in and out',
+                    '**◎** — back to where you are',
+                    'Drag to move around',
+                    '**"Directions"** — opens the route in your phone\'s map app',
+                  ],
+                },
+                { p: 'Blue numbers are places to rest, green letters are places to escape to. The epicentre has its own map.' },
+              ],
+            },
+            {
+              id: 'basis',
+              h: 'Where the numbers come from',
+              blocks: [
+                { p: 'The time until service resumes comes from published research.' },
+                { note: 'Takahama and Midorikawa, "A method for estimating railway suspension time during earthquakes", Journal of Japan Association for Earthquake Engineering, Vol. 11 No. 2 (2011). Based on interviews with 24 railway operators in the Tokyo area.' },
+                {
+                  table: {
+                    head: ['Intensity', 'Inspection', 'Back in'],
+                      narrow: true,
+                    rows: [
+                      ['4', 'Slow-running inspection of key structures', '30 min + 5 min'],
+                      ['5- / 5+', 'Walking inspection', '6.0 min per km (min. 30) ± 30 min + 5 min'],
+                      ['6- and above', 'Damage is likely; inspection alone does not end it', 'No time is given'],
+                    ],
+                  },
+                },
+                { p: 'The length to inspect counts only the sections that were hit at intensity 5- or above. The error in measuring that (±40%) and the scatter in the formula itself (±30 min) are combined into the range you see.' },
+                { p: '**There is a real limit. Railways do not decide from JMA intensity.** Each operator uses its own trackside seismometers. The intensity used here comes from a JMA observation point up to 20 km away — it is a proxy, nothing more.' },
+                { p: 'That is why it is given as a range, never as a statement, and why an operator saying "normal" overrides it. **Always confirm with station staff or the operator before you move.**' },
+              ],
+            },
+            {
+              id: 'offline',
+              h: 'When you have no signal',
+              blocks: [
+                { p: 'If you have opened it once, the station, railway and shelter data are already on your device. Only the earthquake information is always fetched fresh — if that fails, you see the last data received, marked "offline".' },
+                { note: 'The **Last checked** time is always shown at the bottom. Check it, so you never act on stale information.' },
+              ],
+            },
+            {
+              id: 'try',
+              h: 'Try it',
+              blocks: [
+                { p: 'On a day with no earthquake you will only ever see "running normally". These links show the app working on synthetic data. A red "TEST DATA" banner appears, so it can never be mistaken for the real thing.' },
+                {
+                  links: [
+                    ['Intensity 5- — likely stopped', DEMO, 'The central case: the time range, and whether you get back tonight.'],
+                    ['Intensity 6+ — rail unusable', SIX, 'Deciding to book a room instead of waiting, plus the shelter map.'],
+                    ['First report (3 minutes in)', PROMPT, 'Before the detailed intensities arrive.'],
+                    ['A real earthquake (2026-08-23, northern Ibaraki M5.9)', REAL, 'Real data, not a test. What the estimate looked like that morning.'],
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'faq',
+              h: 'Questions',
+              blocks: [
+                {
+                  qa: [
+                    ['Do I have to allow location access?', 'No. Search for a station in Settings instead. Your accommodation and flight alone are enough to decide.'],
+                    ['Will it notify me?', 'No. You open it yourself after an earthquake — which is why you should save the link with your settings.'],
+                    ['Do I need an account?', 'No. Your settings live only on your device and in the URL.'],
+                    ['Why not show the seismic intensity prominently?', 'Because the number itself does not help you decide. It is there in the per-line detail if you want it.'],
+                    ['Does it cover Shinkansen and flights?', 'Shinkansen lines are covered. Flight delays and cancellations are not — ask your airline.'],
+                    ['How accurate is the estimate?', 'It is given as a range, and the real resumption depends on what the inspection finds. When the operator\'s own status is available, that overrides the estimate.'],
+                  ],
+                },
+              ],
+            },
+          ],
+          sourcesLabel: 'Sources',
+          sources:
+            'Japan Meteorological Agency / P2P Earthquake Information / National Land Numerical Information (railway data) CC BY 4.0 / Public Transportation Open Data Center / Geospatial Information Authority of Japan (evacuation sites, GSI Tiles, reverse geocoder) / Tokyo Metropolitan Government Open Data Catalog (temporary stay facilities) CC BY 4.0 / Takahama & Midorikawa (2011), J. Japan Assoc. Earthquake Eng. 11(2)',
+          disclaimer:
+            'This is an estimate. Railways decide using their own trackside sensors, not the figures used here. Always confirm with the operator or station staff before acting.',
+        },
+
+        // ── 中文 ──────────────────────────────────────────────
+        zh: {
+          docTitle: '使用方法 — 走还是等',
+          appName: '走还是等',
+          tagline: '地震之后，日本的电车还开吗',
+          title: '使用方法',
+          lede: '地震之后，是继续等，还是先找今晚的住处。这个页面怎么看。',
+          openApp: '打开应用',
+          toc: '目录',
+          sections: [
+            {
+              id: 'what',
+              h: '这个应用是做什么的',
+              blocks: [
+                { p: '大地震之后，日本各铁路公司的通告都是同一句话：「为确认安全，目前暂停运行。恢复运行的时间尚不明确。」' },
+                { p: '这并非有意隐瞒。检查的内容不同，恢复时间差别很大，公司也给不出准确数字。但等待的人很为难。**再等一小时可以等，再等六小时就该订房了。**而你无从判断。' },
+                { p: '这个应用把那个空白填上数字。它只回答一个问题。' },
+                { note: '**是继续等，还是现在就确保今晚的住处——让你现在就能决定。**' },
+                { p: '页面不会把震度放在最前面。就算告诉你「震度5弱」，你也不知道那对自己意味着什么。它会直接说「预计已停运，恢复还需约几小时」。' },
+              ],
+            },
+            {
+              id: 'before',
+              h: '地震之前，只需一分钟',
+              blocks: [
+                { p: '等地震发生后再设置就太晚了。**请在抵达日本的当天打开一次并完成设置。**' },
+                {
+                  steps: [
+                    ['打开右上角的「设置」', ''],
+                    ['你所在的位置', '允许定位，或搜索车站。允许定位后会显示具体地址——语言不通时，把画面给站务员或出租车司机看即可。'],
+                    ['住宿地点', '搜索住处附近的车站。不需要人在那里。'],
+                    ['回程航班', '填入机场和起飞时间，还会告诉你坐电车是否来得及。'],
+                    ['语言', '中文 / 日本語 / EN / 한국어。'],
+                    ['「复制带设置的链接」', '设置会写进 URL。保存下来，换一台设备也能打开同样的设置，也可以直接发给同行的人。'],
+                  ],
+                },
+                { note: '**打开过一次之后，没有网络也能用。**观测点、线路、避难场所的数据会留在设备上。地震之后网络会很拥堵。' },
+              ],
+            },
+            {
+              id: 'verdict',
+              h: '怎么看画面 — 最上面的色块',
+              blocks: [
+                { p: '只看最上面的色块，就能决定走还是等。实际会出现的是下面六种。' },
+                {
+                  bands: [
+                    ['v-normal', '正常运行', '没有发生足以让电车停运的地震。', '可以照原计划出行。'],
+                    ['v-delay', '可能延误', '一边确认线路一边低速运行。', '电车在动。请预留充裕时间。'],
+                    ['v-delay', '观测到强烈震动 — 正在等待详情', '仅为速报阶段。各观测点的震度还没到。', '先不要移动，请确保自身安全。'],
+                    ['v-wait', '可能已停运', '恢复运行前，铁路公司正在检查线路。', '会给出恢复时间的区间。以今晚能否回去来判断。'],
+                    ['v-delay', '可能已经恢复', '推算的检查时间已经过去。', '请先向车站或运行信息确认后再行动。'],
+                    ['v-avoid-rail', '铁路可能无法使用', '可能已经受损。恢复或需数日。', '去找今晚能住的地方。不要在车站干等。'],
+                  ],
+                },
+                { note: '有两种是琥珀色，因为它们都表示「还不清楚」。速报阶段绝不会显示为绿色（正常）。' },
+              ],
+            },
+            {
+              id: 'eta',
+              h: '恢复时间区间怎么读',
+              blocks: [
+                { p: '显示是这样的。' },
+                { note: '预计 51 分钟–4 小时 26 分 · 12:24～15:59 左右 后恢复' },
+                { p: '之所以是区间，是因为准确时刻无法得知，取决于检查的结果。**请按较晚的一端（本例为 15:59）来考虑。**' },
+                { p: '如果 15:59 才恢复，你当天还能回到住处吗？如果不能，现在就确保住处更稳妥。地震之后，车站附近的酒店几小时内就会订满。' },
+                { p: '除了「还需 4 小时 26 分」之外还给出具体时刻，是为了不让你在紧张之中做减法。' },
+              ],
+            },
+            {
+              id: 'places',
+              h: '地点行与线路明细',
+              blocks: [
+                { p: '色块下面，是你所在的位置、住宿地点、回程航班各一行。右侧的标记表示该地点周边电车的状态。' },
+                {
+                  chips: [
+                    ['c-normal', '正常', '在运行。'],
+                    ['c-delay', '延误', '低速运行，会晚点。'],
+                    ['c-wait', '停运', '检查中。会给出恢复时间区间。'],
+                    ['c-avoid-rail', '中断', '可能受损，或需数日。'],
+                    ['c-delay', '速报', '详细震度还没到。'],
+                    ['c-delay', '待确认', '推算的检查时间已过。'],
+                    ['c-unknown', '不明', '附近没有观测点。'],
+                  ],
+                },
+                { p: '点击某一行，会展开该地点周边的线路。再点线路上的「+」，就能看到判断的依据。' },
+                {
+                  ul: [
+                    '**线路上最强的震动** — 在哪个气象厅观测点、震度多少',
+                    '**需要检查的区间** — 需要步行检查多少公里',
+                    '**恢复还需** — 由该区间长度推算出的区间',
+                    '**对应的线路** — 作为依据的国土数值信息线路名称',
+                    '**铁路公司通告** — 如果取到了运行信息，会显示原文和发布时点',
+                  ],
+                },
+                { note: '标记上带 **✓**，表示已由铁路公司的运行信息核实——那是事实，不是推测。反过来，如果公司说「正常」，推测就会被撤下，回到正常。' },
+              ],
+            },
+            {
+              id: 'flight',
+              h: '回程航班',
+              blocks: [
+                { p: '设置了机场和起飞时间后，还会判断坐电车是否来得及。' },
+                {
+                  ul: [
+                    '应该来得及，但请比原计划提早出发',
+                    '相当勉强。请现在就出发，或考虑改签',
+                    '坐电车可能来不及。请联系航空公司',
+                  ],
+                },
+                { note: '即使电车不行，机场巴士和出租车往往还在运行。' },
+              ],
+            },
+            {
+              id: 'shelter',
+              h: '休息的地方，和避险的地方',
+              blocks: [
+                { p: '画面上的两类用途完全不同，请不要混淆。' },
+                {
+                  table: {
+                    head: ['', '用途'],
+                    rows: [
+                      ['回不去时可以休息的地方', '为回家困难者开放的设施（临时停留设施）。到了这里，就能坐着等到电车恢复。'],
+                      ['躲避危险的地方', '建筑物有危险、或需要躲避火灾时前往的场所（指定紧急避难场所），由市区町村指定。'],
+                    ],
+                  },
+                },
+                { note: '**如果你现在在安全的建筑物内，请先不要移动。**日本在地震之后会呼吁大家不要一齐移动。' },
+                { p: '这些设施当前是否已开放，无法得知，因为没有公开的信息。休息的地方（临时停留设施）目前只收录了东京都公开的部分。没有显示的地区，并不代表附近没有。' },
+              ],
+            },
+            {
+              id: 'map',
+              h: '地图',
+              blocks: [
+                {
+                  ul: [
+                    '**+ / −** — 放大、缩小',
+                    '**◎** — 回到当前位置',
+                    '可以拖动',
+                    '**「查看路线」** — 用手机的地图应用打开路线',
+                  ],
+                },
+                { p: '蓝色数字是休息的地方，绿色字母是避险的地方。震源另有一张地图。' },
+              ],
+            },
+            {
+              id: 'basis',
+              h: '这些数字从何而来',
+              blocks: [
+                { p: '恢复所需时间来自已发表的研究的推算式。' },
+                { note: '高浜勉・翠川三郎《地震时铁路停运时间的推算方法》日本地震工学会论文集 第11卷第2号 (2011)。基于对首都圈24家铁路公司的访谈。' },
+                {
+                  table: {
+                    head: ['震度', '检查', '恢复还需'],
+                      narrow: true,
+                    rows: [
+                      ['4', '注意运行检查、重要部位检查', '30 分 + 5 分'],
+                      ['5弱・5强', '步行检查', '每公里 6.0 分（最少 30 分）± 30 分 + 5 分'],
+                      ['6弱以上', '可能受损，仅靠检查无法结束', '不给出时间'],
+                    ],
+                  },
+                },
+                { p: '需要检查的区间长度，只计算震度5弱以上波及的区段。该测量的误差（±40%）与公式本身的离散（±30分）叠加，就是画面上的区间。' },
+                { p: '**这有局限。铁路公司并不依据气象厅的震度判断。**各公司使用沿线自设地震仪的数值来实施限速。这里使用的震度来自最远20公里外的气象厅观测点，只是一个代用指标。' },
+                { p: '所以它以区间给出，不下断言；一旦运行信息说「正常」，推测就会被撤下。**行动之前，请务必向站务员或铁路公司确认。**' },
+              ],
+            },
+            {
+              id: 'offline',
+              h: '没有网络时',
+              blocks: [
+                { p: '只要打开过一次，观测点、线路、避难场所的数据就已在设备上。只有地震信息一定会去获取；获取不到时，会显示最后一次取到的内容，并标注「离线」。' },
+                { note: '页面下方一定会显示**最后获取**的时刻。请查看它，避免依据过时的信息判断。' },
+              ],
+            },
+            {
+              id: 'try',
+              h: '试用',
+              blocks: [
+                { p: '没有地震的日子只会显示「正常运行」。下面的链接用模拟数据展示实际效果。画面上方会出现红色的「测试数据」提示条，不会与真实情况混淆。' },
+                {
+                  links: [
+                    ['震度5弱 — 可能已停运', DEMO, '核心画面：恢复时间区间，以及今晚能否回去。'],
+                    ['震度6强 — 铁路无法使用', SIX, '不再等待、直接订房的判断，以及休息场所的地图。'],
+                    ['速报阶段（发生3分钟后）', PROMPT, '详细震度尚未送达的状态。'],
+                    ['真实地震（2026-08-23 茨城县南部 M5.9）', REAL, '不是测试，是真实数据。当天的推算是什么样。'],
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'faq',
+              h: '常见问题',
+              blocks: [
+                {
+                  qa: [
+                    ['不允许定位就不能用吗。', '可以用。在设置里搜索车站即可。只填住宿地点和航班也足以判断。'],
+                    ['会有推送通知吗。', '没有。前提是地震之后你自己打开。所以请把带设置的链接保存下来。'],
+                    ['需要注册或登录吗。', '不需要。设置只保存在设备和 URL 里。'],
+                    ['为什么不把震度显示得很大。', '因为震度本身不能作为判断依据。需要时可在线路明细中查看。'],
+                    ['新干线和飞机呢。', '新干线作为线路会显示。飞机的延误、取消无法提供，请向航空公司确认。'],
+                    ['这个预测准吗。', '它以区间给出，实际恢复取决于检查结果。若能取到铁路公司的运行信息，会以其为准。'],
+                  ],
+                },
+              ],
+            },
+          ],
+          sourcesLabel: '数据来源',
+          sources:
+            '气象厅 / P2P地震情报 / 国土数值信息（铁道数据）CC BY 4.0 / 公共交通开放数据中心 / 国土地理院（指定紧急避难场所・地理院地图瓦片・逆地理编码） / 东京都开放数据目录（临时停留设施）CC BY 4.0 / 高浜・翠川 (2011) 日本地震工学会论文集 11(2)',
+          disclaimer:
+            '这只是推测。铁路公司依据自设的沿线地震仪判断，与这里使用的数值不同。行动前请务必向运营方或站务员确认。',
+        },
+
+        // ── 한국어 ────────────────────────────────────────────
+        ko: {
+          docTitle: '사용법 — 갈까, 기다릴까',
+          appName: '갈까, 기다릴까',
+          tagline: '지진 후 일본의 전철은 움직이나',
+          title: '사용법',
+          lede: '지진 후, 기다릴지 오늘 밤 잘 곳을 확보할지. 이 화면을 읽는 법.',
+          openApp: '앱 열기',
+          toc: '목차',
+          sections: [
+            {
+              id: 'what',
+              h: '이 앱은 무엇을 하나',
+              blocks: [
+                { p: '큰 지진 뒤, 일본의 철도 회사 안내는 모두 같은 문장이 됩니다. 「안전 확인을 위해 운행을 중단하고 있습니다. 재개 시점은 미정입니다.」' },
+                { p: '숨기는 것이 아닙니다. 점검 내용에 따라 복구 시간이 크게 달라져 정확한 숫자를 낼 수 없습니다. 하지만 기다리는 쪽은 곤란합니다. **한 시간이면 기다리고, 여섯 시간이면 숙소를 잡는다.** 그 판단을 할 수 없습니다.' },
+                { p: '이 앱은 그 빈칸에 숫자를 넣습니다. 답하는 것은 하나뿐입니다.' },
+                { note: '**기다릴지, 오늘 밤 잘 곳을 확보할지를 지금 정할 수 있게 한다.**' },
+                { p: '진도를 앞세우지 않습니다. 「진도 5약」이라고 들어도 그것이 나에게 무엇을 뜻하는지 알 수 없기 때문입니다. 대신 「운행 중단 예상 · 재개까지 약 몇 시간」이라고 말합니다.' },
+              ],
+            },
+            {
+              id: 'before',
+              h: '지진 전에, 1분만',
+              blocks: [
+                { p: '지진이 난 뒤에 설정하기에는 너무 늦습니다. **일본에 도착한 날 한 번 열어 설정해 두세요.**' },
+                {
+                  steps: [
+                    ['오른쪽 위의 「설정」을 연다', ''],
+                    ['현재 위치', '위치 정보를 허용하거나 역을 검색합니다. 허용하면 주소로 표시되므로, 말이 통하지 않을 때 역무원이나 택시 기사에게 화면을 보여 주면 됩니다.'],
+                    ['숙소', '묵는 곳 근처의 역을 검색합니다. 지금 거기에 있을 필요는 없습니다.'],
+                    ['출국 항공편', '공항과 출발 시각을 넣으면 전철로 시간에 맞출 수 있는지까지 알려 줍니다.'],
+                    ['언어', '한국어 / 日本語 / EN / 中文.'],
+                    ['「설정이 포함된 링크 복사」', '설정은 URL에 담깁니다. 저장해 두면 다른 기기에서도 같은 설정으로 열 수 있고, 동행자에게 그대로 건넬 수 있습니다.'],
+                  ],
+                },
+                { note: '**한 번 열어 두면 권역 밖에서도 쓸 수 있습니다.** 관측점·노선·대피 장소 데이터가 기기에 남기 때문입니다. 지진 후에는 회선이 혼잡해집니다.' },
+              ],
+            },
+            {
+              id: 'verdict',
+              h: '화면 읽는 법 — 맨 위의 색 띠',
+              blocks: [
+                { p: '맨 위의 색 띠만 읽으면 갈지 기다릴지 알 수 있습니다. 실제로 나오는 여섯 가지입니다.' },
+                {
+                  bands: [
+                    ['v-normal', '정상 운행', '전철을 멈출 만한 지진은 일어나지 않았습니다.', '그대로 이동해도 괜찮습니다.'],
+                    ['v-delay', '지연 예상', '선로를 확인하면서 서행으로 움직이고 있습니다.', '전철은 움직입니다. 시간을 넉넉히 잡으세요.'],
+                    ['v-delay', '강한 흔들림 관측 — 상세 정보 대기 중', '속보 단계. 관측점별 진도가 아직 오지 않았습니다.', '먼저 움직이지 말고 안전을 확보하세요.'],
+                    ['v-wait', '운행 중단 예상', '재개 전에 철도 회사가 선로를 점검하고 있습니다.', '재개까지의 범위가 나옵니다. 오늘 밤 돌아갈 수 있는지로 판단하세요.'],
+                    ['v-delay', '재개했을 수 있습니다', '추정한 점검 시간이 지났습니다.', '역 안내나 운행 정보로 확인한 뒤 움직이세요.'],
+                    ['v-avoid-rail', '철도 이용 불가 예상', '피해가 있을 가능성. 복구에 며칠이 걸릴 수 있습니다.', '오늘 밤 묵을 곳을 찾으세요. 역에서 기다리지 마세요.'],
+                  ],
+                },
+                { note: '호박색이 둘인 것은, 둘 다 「아직 알 수 없다」는 뜻이기 때문입니다. 속보 단계를 초록(정상)으로 표시하지 않습니다.' },
+              ],
+            },
+            {
+              id: 'eta',
+              h: '재개까지의 범위를 읽는 법',
+              blocks: [
+                { p: '이렇게 표시됩니다.' },
+                { note: '재개까지 51분–4시간 26분 · 12:24~15:59쯤' },
+                { p: '범위인 것은 정확한 시각을 알 수 없기 때문입니다. 점검 결과에 따라 달라집니다. **늦은 쪽(이 예에서는 15:59)으로 생각하세요.**' },
+                { p: '15:59에 재개해서 그날 안에 숙소로 돌아갈 수 있는지. 돌아갈 수 없다면 지금 잘 곳을 확보하는 편이 확실합니다. 지진 후 역 근처 호텔은 몇 시간 만에 찹니다.' },
+                { p: '「4시간 26분 남음」뿐 아니라 시각도 함께 내는 것은, 긴장 속에서 뺄셈을 하지 않게 하기 위해서입니다.' },
+              ],
+            },
+            {
+              id: 'places',
+              h: '장소 행과 노선 내역',
+              blocks: [
+                { p: '색 띠 아래에 현재 위치·숙소·출국 항공편이 한 줄씩 놓입니다. 오른쪽 표시가 그 장소 주변 전철의 상태입니다.' },
+                {
+                  chips: [
+                    ['c-normal', '정상', '움직이고 있습니다.'],
+                    ['c-delay', '지연', '서행. 움직이지만 늦어집니다.'],
+                    ['c-wait', '중단', '점검 중. 재개까지의 범위가 나옵니다.'],
+                    ['c-avoid-rail', '불통', '피해 가능성. 며칠이 될 수 있습니다.'],
+                    ['c-delay', '속보', '상세 진도가 아직 오지 않았습니다.'],
+                    ['c-delay', '확인 필요', '추정한 점검 시간이 지났습니다.'],
+                    ['c-unknown', '불명', '근처에 관측점이 없습니다.'],
+                  ],
+                },
+                { p: '행을 누르면 그 주변 노선이 한 줄씩 펼쳐집니다. 노선의 「+」를 누르면 왜 그렇게 판단했는지 볼 수 있습니다.' },
+                {
+                  ul: [
+                    '**노선에서 가장 강한 흔들림** — 어느 기상청 관측점에서 진도 얼마였는지',
+                    '**점검이 필요한 구간** — 몇 km를 걸어서 점검하게 되는지',
+                    '**재개까지** — 그 구간 길이에서 낸 범위',
+                    '**해당하는 선로** — 근거가 된 국토수치정보의 선로 명칭',
+                    '**철도 회사 안내** — 운행 정보를 받았다면 그 문구와 시점',
+                  ],
+                },
+                { note: '표시에 **✓**가 붙어 있으면 철도 회사의 운행 정보로 확인된 것입니다. 추정이 아니라 사실입니다. 반대로 회사가 「정상」이라고 하면 추정을 거두고 정상으로 되돌립니다.' },
+              ],
+            },
+            {
+              id: 'flight',
+              h: '출국 항공편',
+              blocks: [
+                { p: '공항과 출발 시각을 설정해 두면, 전철로 시간에 맞출 수 있는지까지 알려 줍니다.' },
+                {
+                  ul: [
+                    '늦지 않을 것으로 보이지만, 예정보다 일찍 나서세요',
+                    '상당히 빠듯합니다. 지금 움직이거나 항공편 변경을 검토하세요',
+                    '전철로는 늦을 것으로 보입니다. 항공사에 연락하세요',
+                  ],
+                },
+                { note: '전철이 안 되더라도 공항 버스나 택시는 움직이고 있는 경우가 있습니다.' },
+              ],
+            },
+            {
+              id: 'shelter',
+              h: '쉴 수 있는 곳과, 위험을 피하는 곳',
+              blocks: [
+                { p: '화면에 나오는 두 가지는 용도가 전혀 다릅니다. 혼동하지 마세요.' },
+                {
+                  table: {
+                    head: ['', '무엇을 위한 곳인가'],
+                    rows: [
+                      ['돌아갈 수 없을 때 쉴 수 있는 곳', '귀가 곤란자를 위해 개방되는 시설(일시 체류 시설). 여기까지 오면 전철이 움직일 때까지 앉아서 기다릴 수 있습니다.'],
+                      ['위험을 피하는 곳', '건물이 위험하거나 화재를 피할 때 향하는 장소(지정 긴급 대피 장소). 시구정촌이 지정합니다.'],
+                    ],
+                  },
+                },
+                { note: '**지금 안전한 건물 안에 있다면 먼저 움직이지 마세요.** 일본에서는 지진 후 한꺼번에 이동하지 않도록 요청하고 있습니다.' },
+                { p: '해당 시설이 지금 개설되어 있는지는 알 수 없습니다. 공개된 정보가 없기 때문입니다. 쉴 수 있는 곳(일시 체류 시설)은 현재 도쿄도의 공개분만 수록하고 있습니다. 나오지 않는 지역이라도 「근처에 없다」는 뜻은 아닙니다.' },
+              ],
+            },
+            {
+              id: 'map',
+              h: '지도',
+              blocks: [
+                {
+                  ul: [
+                    '**+ / −** — 확대·축소',
+                    '**◎** — 현재 위치로 되돌리기',
+                    '드래그로 이동할 수 있습니다',
+                    '**「경로 보기」** — 기기의 지도 앱으로 길을 엽니다',
+                  ],
+                },
+                { p: '파란 숫자가 쉴 수 있는 곳, 초록 기호가 위험을 피하는 곳입니다. 진원은 별도의 지도로 볼 수 있습니다.' },
+              ],
+            },
+            {
+              id: 'basis',
+              h: '이 숫자는 어디서 오는가',
+              blocks: [
+                { p: '재개까지의 시간은 기존 연구의 추정식에서 나옵니다.' },
+                { note: '다카하마 쓰토무·미도리카와 사부로 「지진 시 철도 운휴 시간의 추정 방법」 일본지진공학회 논문집 제11권 제2호 (2011). 수도권 철도 사업자 24개 사 면담이 바탕입니다.' },
+                {
+                  table: {
+                    head: ['진도', '점검', '재개까지'],
+                      narrow: true,
+                    rows: [
+                      ['4', '주의 운전 점검·주요 개소 점검', '30분 + 5분'],
+                      ['5약·5강', '도보 점검', '1km당 6.0분(최소 30분) ± 30분 + 5분'],
+                      ['6약 이상', '피해가 나는 영역. 점검만으로 끝나지 않음', '시간을 내지 않습니다'],
+                    ],
+                  },
+                },
+                { p: '점검 구간의 길이는 진도 5약 이상이 미친 구간만 셉니다. 그 측정의 오차(±40%)와 식 자체의 편차(±30분)를 겹친 것이 화면에 나오는 범위입니다.' },
+                { p: '**한계가 있습니다. 철도 회사는 기상청 진도로 판단하지 않습니다.** 각 사는 선로변에 둔 자체 지진계 값으로 규제를 겁니다. 여기서 쓰는 진도는 최대 20km 떨어진 기상청 관측점의 값으로, 대리 지표일 뿐입니다.' },
+                { p: '그래서 범위로 내고 단정하지 않으며, 운행 정보가 「정상」이라고 하면 추정을 버립니다. **움직이기 전에 반드시 역무원이나 철도 회사에 확인하세요.**' },
+              ],
+            },
+            {
+              id: 'offline',
+              h: '권역 밖일 때',
+              blocks: [
+                { p: '한 번 열어 두었다면 관측점·노선·대피 장소 데이터는 기기에 남아 있습니다. 지진 정보만은 반드시 받으러 가므로, 받지 못하면 마지막으로 받은 내용을 「오프라인」이라고 붙여 표시합니다.' },
+                { note: '화면 아래에 **마지막 확인** 시각이 반드시 나옵니다. 오래된 정보로 판단하지 않도록 거기를 보세요.' },
+              ],
+            },
+            {
+              id: 'try',
+              h: '시험해 보기',
+              blocks: [
+                { p: '지진이 없는 날에는 「정상 운행」만 나옵니다. 아래 링크로 가상의 데이터에서 실제 동작을 볼 수 있습니다. 화면 위에 빨간 「테스트 데이터」 띠가 나오므로 실제와 섞이지 않습니다.' },
+                {
+                  links: [
+                    ['진도 5약 — 운행 중단 예상', DEMO, '중심이 되는 화면. 재개까지의 범위와, 오늘 밤 돌아갈 수 있는지의 판단.'],
+                    ['진도 6강 — 철도 이용 불가', SIX, '기다리지 않고 숙소를 잡는 판단과, 쉴 수 있는 곳의 지도.'],
+                    ['속보 단계(발생 3분 후)', PROMPT, '상세 진도가 아직 오지 않은 상태.'],
+                    ['실제 지진(2026-08-23 이바라키현 남부 M5.9)', REAL, '테스트가 아닌 실제 데이터. 그날의 추정은 어땠는지.'],
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'faq',
+              h: '자주 묻는 질문',
+              blocks: [
+                {
+                  qa: [
+                    ['위치 정보를 허용하지 않으면 못 쓰나요.', '쓸 수 있습니다. 설정에서 역을 검색하세요. 숙소와 출국 항공편만으로도 판단할 수 있습니다.'],
+                    ['알림이 오나요.', '오지 않습니다. 지진 후 직접 여는 것을 전제로 합니다. 그래서 설정이 포함된 링크를 저장해 두세요.'],
+                    ['가입이나 로그인이 필요한가요.', '없습니다. 설정은 기기와 URL에만 남습니다.'],
+                    ['왜 진도를 크게 보여 주지 않나요.', '진도 자체는 판단 재료가 되지 않기 때문입니다. 필요하면 노선 내역에 나옵니다.'],
+                    ['신칸센이나 비행기는 알 수 있나요.', '신칸센은 노선으로 나옵니다. 항공편의 지연·결항은 낼 수 없습니다. 항공사에 확인하세요.'],
+                    ['이 예상은 맞나요.', '범위로 냅니다. 실제 재개는 점검 결과에 달려 있습니다. 철도 회사의 운행 정보를 받으면 그것으로 덮어씁니다.'],
+                  ],
+                },
+              ],
+            },
+          ],
+          sourcesLabel: '출처',
+          sources:
+            '기상청 / P2P지진정보 / 국토수치정보(철도 데이터) CC BY 4.0 / 공공교통 오픈데이터 센터 / 국토지리원(지정 긴급 대피 장소·지리원 타일·역지오코더) / 도쿄도 오픈데이터 카탈로그(일시 체류 시설) CC BY 4.0 / 다카하마·미도리카와 (2011) 일본지진공학회 논문집 11(2)',
+          disclaimer:
+            '이것은 추정입니다. 철도 회사는 자체 선로변 지진계로 판단하며, 여기서 쓰는 수치와는 다릅니다. 움직이기 전에 반드시 사업자나 역무원에게 확인하세요.',
+        },
+      }
+
+      // ── 描画 ────────────────────────────────────────────────
+
+      const esc = (s) =>
+        String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+      /** 本文の中の **強調** と `コード` だけ拾う。書きやすさのため。 */
+      const md = (s) =>
+        esc(s)
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/`(.+?)`/g, '<code>$1</code>')
+
+      function block(b, lang) {
+        if (b.p) return `<p>${md(b.p)}</p>`
+        if (b.note) return `<p class="note">${md(b.note)}</p>`
+        if (b.ul) return `<ul>${b.ul.map((i) => `<li>${md(i)}</li>`).join('')}</ul>`
+        if (b.steps) {
+          return `<ol class="steps">${b.steps
+            .map(([t, d]) => `<li><strong>${md(t)}</strong>${d ? `<span>${md(d)}</span>` : ''}</li>`)
+            .join('')}</ol>`
+        }
+        if (b.bands) {
+          return b.bands
+            .map(
+              ([cls, status, lead, act]) =>
+                `<div class="band ${cls}"><strong>${esc(status)}</strong><span>${esc(lead)}</span><em>${esc(act)}</em></div>`,
+            )
+            .join('')
+        }
+        if (b.chips) {
+          return `<ul class="chiplist">${b.chips
+            .map(([cls, label, desc]) => `<li><span class="chip ${cls}">${esc(label)}</span><span>${esc(desc)}</span></li>`)
+            .join('')}</ul>`
+        }
+        if (b.table) {
+          const head = b.table.head.map((h) => `<th>${esc(h)}</th>`).join('')
+          const rows = b.table.rows
+            .map((r) => `<tr>${r.map((c) => `<td>${md(c)}</td>`).join('')}</tr>`)
+            .join('')
+          return `<div class="tablewrap"><table class="${b.table.narrow ? 'narrow' : ''}"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+        }
+        if (b.qa) {
+          return `<dl>${b.qa.map(([q, a]) => `<dt>${md(q)}</dt><dd>${md(a)}</dd>`).join('')}</dl>`
+        }
+        if (b.links) {
+          return `<ul class="trylist">${b.links
+            .map(([label, href, note]) => {
+              const url = typeof href === 'function' ? href(lang) : href[lang] ?? href
+              return `<li><a href="${esc(url)}">${esc(label)}</a><span>${esc(note)}</span></li>`
+            })
+            .join('')}</ul>`
+        }
+        return ''
+      }
+
+      function render(lang) {
+        const s = CONTENT[lang]
+        document.documentElement.lang = lang
+        document.title = s.docTitle
+
+        const langs = LANGS.map(
+          (l) => `<button class="pill${l.code === lang ? ' on' : ''}" data-lang="${l.code}">${esc(l.label)}</button>`,
+        ).join('')
+
+        const toc = s.sections
+          .map((sec) => `<li><a href="#${sec.id}">${esc(sec.h)}</a></li>`)
+          .join('')
+
+        const body = s.sections
+          .map(
+            (sec) =>
+              `<section id="${sec.id}"><h2>${esc(sec.h)}</h2>${sec.blocks.map((b) => block(b, lang)).join('')}</section>`,
+          )
+          .join('')
+
+        document.getElementById('doc').innerHTML = `
+          <header class="top">
+            <div class="brand">
+              <h1>${esc(s.appName)}</h1>
+              <p>${esc(s.tagline)}</p>
+            </div>
+            <div class="langs">${langs}</div>
+          </header>
+
+          <div class="lede">
+            <h2>${esc(s.title)}</h2>
+            <p>${esc(s.lede)}</p>
+            <a class="openapp" href="index.html?lang=${lang}">${esc(s.openApp)}</a>
+          </div>
+
+          <nav class="toc"><strong>${esc(s.toc)}</strong><ol>${toc}</ol></nav>
+
+          ${body}
+
+          <footer>
+            <p>${esc(s.disclaimer)}</p>
+            <p>${esc(s.sourcesLabel)}: ${esc(s.sources)}</p>
+          </footer>`
+
+        for (const btn of document.querySelectorAll('[data-lang]')) {
+          btn.addEventListener('click', () => {
+            const url = new URL(location.href)
+            url.searchParams.set('lang', btn.dataset.lang)
+            history.replaceState(null, '', url)
+            render(btn.dataset.lang)
+            window.scrollTo(0, 0)
+          })
+        }
+      }
+
+      /**
+       * 言語の決め方。URL → アプリの保存済み設定 → 端末の言語。
+       *
+       * アプリ側の設定を読むだけで、書き戻さない。マニュアルで一時的に
+       * 英語にしただけで、アプリの言語まで変わったら驚く。
+       */
+      function initialLang() {
+        const q = new URLSearchParams(location.search).get('lang')
+        if (q && CONTENT[q]) return q
+        try {
+          const saved = JSON.parse(localStorage.getItem('config') ?? '{}')
+          if (saved.lang && CONTENT[saved.lang]) return saved.lang
+        } catch {
+          // 読めなくても端末の言語で出せる。
+        }
+        for (const raw of navigator.languages ?? [navigator.language]) {
+          const l = String(raw).toLowerCase()
+          if (l.startsWith('ja')) return 'ja'
+          if (l.startsWith('zh')) return 'zh'
+          if (l.startsWith('ko')) return 'ko'
+          if (l.startsWith('en')) return 'en'
+        }
+        return 'en'
+      }
+
+      render(initialLang())
+
+      // アプリと同じ Service Worker に載せる。圏外でもマニュアルは読める。
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {})
+      }
+    </script>
+  </body>
+</html>
