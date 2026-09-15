@@ -13,7 +13,13 @@
 #    先にローカルサーバを立てておく (python -m http.server 8080)
 node 生成スクリプト/shoot.mjs "$(pwd)/公共交通オープンデータチャレンジ2026/素材"
 
-# 2. サムネイル → 素材/サムネイル.png  (1 の 01_verdict_en.png を使う)
+# 2. サムネイル → 素材/サムネイル.png (イラスト版。いま使っている方)
+#    SVG を Chrome で PNG に書き出す。日本語パスを避けて一時フォルダ経由で
+cp 生成スクリプト/thumb_illust.html "$TEMP/thumb_illust.html"
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --hide-scrollbars   --user-data-dir="$(cygpath -w "$TEMP")\thumb-profile" --window-size=1280,720   --screenshot="$(cygpath -w "$TEMP")\thumb_illust.png" "file:///$(cygpath -m "$TEMP")/thumb_illust.html"
+cp "$TEMP/thumb_illust.png" 素材/サムネイル.png
+
+#    画面版 → 素材/サムネイル_画面版.png (1 の 01_verdict_en.png を使う。差し替え前のもの)
 python 生成スクリプト/thumb.py
 
 # 3. スライド → 紹介スライド.pptx (動画版 11 枚) と 紹介スライド_詳細版.pptx (14 枚)
@@ -36,7 +42,8 @@ python 生成スクリプト/build_deck.py
 | 動画に入れるスライドを増減 | `build_deck.py` | `SHORT` のキー（ここに無い番号は動画版から落ちる） |
 | 読み上げ速度・切替の間 | `make_video.ps1` | `$tts.Rate` / `AdvanceTime` |
 | 撮る画面・URL | `shoot.mjs` | `SHOTS` |
-| サムネイルの文言 | `thumb.py` | 下半分の `d.text(...)` |
+| サムネイルの絵と文言 | `thumb_illust.html` | SVG。旅行者は `translate(965 712)` の群、文字は末尾 |
+| サムネイル画面版の文言 | `thumb.py` | 下半分の `d.text(...)` |
 
 長さの目安: 読み上げは約 7 文字/秒（`$tts.Rate = 3`）。
 `build_deck.py` が `video narration chars:` を出すので、**780 文字なら約 120 秒**。

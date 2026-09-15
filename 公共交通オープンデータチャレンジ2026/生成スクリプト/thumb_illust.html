@@ -1,0 +1,203 @@
+<!doctype html>
+<!--
+  紹介動画のサムネイル (1280×720)。地震のあと、止まった電車の前で不安そうな旅行者。
+  外国人らしさは顔立ちではなく、スーツケース・バックパック・スマホで出す。
+
+  書き出し:
+    chrome --headless=new --hide-scrollbars --window-size=1280,720 \
+      --screenshot=サムネイル.png file:///…/thumb_illust.html
+  (手順は README.md)
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: #0e1a2b; }
+  svg { display: block; }
+  text { font-family: "Noto Sans JP", "Yu Gothic UI", "Yu Gothic", sans-serif; }
+</style>
+</head>
+<body>
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c1626"/>
+      <stop offset="1" stop-color="#2c4262"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6f8"/>
+      <stop offset="1" stop-color="#d6dce1"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <pattern id="dots" width="16" height="10" patternUnits="userSpaceOnUse">
+      <circle cx="8" cy="5" r="2.6" fill="#c99a12"/>
+    </pattern>
+  </defs>
+
+  <!-- 空 (夕方〜夜。「今夜どうするか」の時間帯) -->
+  <rect width="1280" height="720" fill="url(#sky)"/>
+
+  <!-- 街のシルエット -->
+  <g fill="#15233a">
+    <rect x="0"    y="238" width="90"  height="70"/>
+    <rect x="96"   y="214" width="70"  height="94"/>
+    <rect x="172"  y="250" width="110" height="58"/>
+    <rect x="290"  y="226" width="64"  height="82"/>
+    <rect x="360"  y="206" width="88"  height="102"/>
+    <rect x="456"  y="244" width="120" height="64"/>
+    <rect x="584"  y="220" width="76"  height="88"/>
+    <rect x="668"  y="252" width="96"  height="56"/>
+    <rect x="772"  y="232" width="70"  height="76"/>
+    <rect x="850"  y="200" width="96"  height="108"/>
+    <rect x="954"  y="240" width="118" height="68"/>
+    <rect x="1080" y="218" width="80"  height="90"/>
+    <rect x="1168" y="246" width="112" height="62"/>
+  </g>
+  <g fill="#f6d365" opacity=".55">
+    <rect x="112" y="228" width="8" height="8"/><rect x="134" y="250" width="8" height="8"/>
+    <rect x="378" y="222" width="8" height="8"/><rect x="404" y="244" width="8" height="8"/>
+    <rect x="600" y="236" width="8" height="8"/><rect x="866" y="216" width="8" height="8"/>
+    <rect x="898" y="240" width="8" height="8"/><rect x="1096" y="234" width="8" height="8"/>
+    <rect x="1190" y="262" width="8" height="8"/><rect x="304" y="244" width="8" height="8"/>
+  </g>
+
+  <!-- 地震計の波形。揺れたことを文字なしで言う -->
+  <polyline fill="none" stroke="#ffd166" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round" opacity=".95"
+    points="58,236 170,236 186,226 198,248 212,210 226,264 242,194 258,276 274,204 290,258 306,220 320,246 334,230 348,240 362,234 380,236 700,236"/>
+
+  <!-- 屋根の縁 -->
+  <rect x="0" y="0" width="1280" height="18" fill="#08101c"/>
+
+  <!-- ── 電車 (止まっている) ── -->
+  <rect x="-20" y="292" width="1320" height="16" rx="6" fill="#c9d1d8"/>
+  <rect x="-20" y="302" width="1320" height="246" rx="18" fill="url(#body)" stroke="#b7c0c8" stroke-width="2"/>
+  <g id="units">
+    <!-- 1 両ぶんの繰り返し。ドアと側窓 -->
+    <g transform="translate(-60 0)">
+      <rect x="20" y="334" width="100" height="210" rx="6" fill="#dfe4e8" stroke="#aeb8c1" stroke-width="2"/>
+      <line x1="70" y1="334" x2="70" y2="544" stroke="#aeb8c1" stroke-width="2"/>
+      <rect x="32" y="352" width="30" height="74" rx="4" fill="#28313c"/>
+      <rect x="78" y="352" width="30" height="74" rx="4" fill="#28313c"/>
+      <rect x="146" y="344" width="176" height="84" rx="8" fill="#28313c"/>
+      <path d="M170 344 L130 428" stroke="#fff" stroke-opacity=".12" stroke-width="22"/>
+    </g>
+  </g>
+  <use href="#units" x="340"/>
+  <use href="#units" x="680"/>
+  <use href="#units" x="1020"/>
+  <!-- 帯 -->
+  <rect x="-20" y="468" width="1320" height="20" fill="#2a9d8f"/>
+  <rect x="-20" y="492" width="1320" height="6" fill="#264653"/>
+  <!-- 床下 -->
+  <rect x="-20" y="546" width="1320" height="18" fill="#23262c"/>
+
+  <!-- ホーム -->
+  <rect x="0" y="562" width="1280" height="158" fill="#565d68"/>
+  <rect x="0" y="562" width="1280" height="12" fill="#c7ccd2"/>
+  <rect x="0" y="586" width="1280" height="20" fill="#f1c232"/>
+  <rect x="0" y="586" width="1280" height="20" fill="url(#dots)"/>
+
+  <!-- ── 発車標 (揺れている) ── -->
+  <g transform="rotate(-4 1025 95)">
+    <line x1="870" y1="0" x2="870" y2="42" stroke="#8a929b" stroke-width="5"/>
+    <line x1="1180" y1="0" x2="1180" y2="42" stroke="#8a929b" stroke-width="5"/>
+    <rect x="820" y="40" width="410" height="118" rx="10" fill="#111317" stroke="#4d535b" stroke-width="4"/>
+    <text x="1025" y="108" font-size="52" font-weight="900" fill="#ff4b3a" text-anchor="middle" filter="url(#glow)">運転見合わせ</text>
+    <text x="1025" y="144" font-size="24" font-weight="700" fill="#ffb347" text-anchor="middle" letter-spacing="7" filter="url(#glow)">SUSPENDED</text>
+  </g>
+  <!-- 揺れの線 -->
+  <g stroke="#ffd166" stroke-width="6" stroke-linecap="round" fill="none">
+    <path d="M800 66 Q784 100 800 134"/>
+    <path d="M778 56 Q756 100 778 144"/>
+    <path d="M1250 58 Q1266 92 1250 126"/>
+    <path d="M1270 48 Q1292 92 1270 136" />
+  </g>
+
+  <!-- ── 旅行者 ── -->
+  <g transform="translate(965 712)">
+    <!-- 影 -->
+    <ellipse cx="-40" cy="2" rx="170" ry="16" fill="#000" opacity=".25"/>
+
+    <!-- スーツケース -->
+    <path d="M-150 -160 V-240 H-112 V-160" stroke="#2b2f35" stroke-width="8" fill="none" stroke-linejoin="round"/>
+    <rect x="-182" y="-164" width="104" height="152" rx="14" fill="#4f79b8"/>
+    <rect x="-182" y="-164" width="104" height="152" rx="14" fill="none" stroke="#3a5d93" stroke-width="3"/>
+    <line x1="-156" y1="-150" x2="-156" y2="-24" stroke="#3a5d93" stroke-width="5"/>
+    <line x1="-104" y1="-150" x2="-104" y2="-24" stroke="#3a5d93" stroke-width="5"/>
+    <circle cx="-164" cy="-4" r="9" fill="#1e2126"/>
+    <circle cx="-96" cy="-4" r="9" fill="#1e2126"/>
+    <!-- 荷札 -->
+    <path d="M-86 -140 L-66 -118" stroke="#8a6d3b" stroke-width="3"/>
+    <rect x="-72" y="-122" width="30" height="20" rx="3" fill="#f4e3b5" transform="rotate(20 -57 -112)"/>
+
+    <!-- バックパック (体の後ろ) -->
+    <rect x="28" y="-338" width="74" height="156" rx="24" fill="#34495e"/>
+    <rect x="42" y="-280" width="48" height="40" rx="10" fill="#2c3e50"/>
+
+    <!-- 脚 -->
+    <rect x="-42" y="-178" width="36" height="170" rx="13" fill="#2f3e5c"/>
+    <rect x="6" y="-178" width="36" height="170" rx="13" fill="#2f3e5c"/>
+    <ellipse cx="-28" cy="-8" rx="32" ry="12" fill="#1f2328"/>
+    <ellipse cx="28" cy="-8" rx="32" ry="12" fill="#1f2328"/>
+
+    <!-- 上着 -->
+    <path d="M-64 -326 Q-74 -250 -60 -166 H60 Q74 -250 64 -326 Q0 -350 -64 -326 Z" fill="#e9a23b"/>
+    <line x1="0" y1="-338" x2="0" y2="-168" stroke="#c9861f" stroke-width="3"/>
+    <path d="M54 -328 Q48 -262 60 -198" stroke="#22313f" stroke-width="11" fill="none" stroke-linecap="round"/>
+
+    <!-- 左腕: スーツケースの取っ手を握る -->
+    <path d="M-58 -316 Q-98 -282 -124 -244" stroke="#e9a23b" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <circle cx="-130" cy="-238" r="15" fill="#e8b98f"/>
+
+    <!-- 右腕: 胸の前でスマホ -->
+    <path d="M58 -316 Q94 -282 80 -250 Q62 -262 34 -272" stroke="#e9a23b" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <g transform="rotate(-10 20 -300)">
+      <rect x="2" y="-338" width="34" height="58" rx="6" fill="#1b2027"/>
+      <rect x="7" y="-331" width="24" height="44" rx="2" fill="#e5483c"/>
+      <rect x="11" y="-322" width="16" height="4" fill="#fff" opacity=".85"/>
+      <rect x="11" y="-313" width="12" height="3" fill="#fff" opacity=".6"/>
+    </g>
+    <circle cx="28" cy="-274" r="14" fill="#e8b98f"/>
+
+    <!-- 首と頭 (発車標を見上げる) -->
+    <rect x="-15" y="-356" width="30" height="32" fill="#e3b18a"/>
+    <g transform="rotate(-9 0 -350)">
+      <circle cx="-54" cy="-400" r="11" fill="#e8b98f"/>
+      <circle cx="54" cy="-400" r="11" fill="#e8b98f"/>
+      <circle cx="0" cy="-402" r="56" fill="#f0c7a2"/>
+      <path d="M-58 -408 Q-64 -474 0 -468 Q62 -474 58 -408 Q50 -446 8 -444 Q-10 -432 -30 -440 Q-50 -440 -58 -408 Z" fill="#6b4a2f"/>
+      <!-- 眉: 内側が上がる = 不安 -->
+      <path d="M-34 -416 L-9 -428" stroke="#4a3322" stroke-width="5.5" stroke-linecap="round"/>
+      <path d="M9 -428 L34 -416" stroke="#4a3322" stroke-width="5.5" stroke-linecap="round"/>
+      <ellipse cx="-19" cy="-398" rx="5.5" ry="8" fill="#2a1f18"/>
+      <ellipse cx="19" cy="-398" rx="5.5" ry="8" fill="#2a1f18"/>
+      <path d="M-15 -366 Q-7 -374 0 -366 Q7 -358 15 -366" stroke="#7a3b2e" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <!-- 汗 -->
+      <path d="M70 -452 Q86 -426 70 -418 Q54 -426 70 -452 Z" fill="#7ec8f2"/>
+    </g>
+
+    <!-- ？ -->
+    <circle cx="-58" cy="-470" r="7" fill="#fff"/>
+    <circle cx="-76" cy="-492" r="10" fill="#fff"/>
+    <circle cx="-112" cy="-530" r="40" fill="#fff" filter="url(#shadow)"/>
+    <text x="-112" y="-510" font-size="56" font-weight="900" fill="#a4231c" text-anchor="middle">?</text>
+  </g>
+
+  <!-- ── 文字 ── -->
+  <g filter="url(#shadow)">
+    <text x="58" y="76" font-size="40" font-weight="800" fill="#ffd0c9" letter-spacing="1">Move or Wait</text>
+    <text x="54" y="182" font-size="92" font-weight="900" fill="#ffffff">動くか、待つか</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="48" y="608" width="700" height="86" rx="16" fill="#a4231c"/>
+    <text x="398" y="665" font-size="42" font-weight="900" fill="#ffffff" text-anchor="middle">地震のあと、電車はあと何時間？</text>
+  </g>
+</svg>
+</body>
+</html>

@@ -1,8 +1,9 @@
-# 動画のサムネイル (1280×720)。判定帯の赤にスマホ画面を添える。
+# 動画のサムネイル・画面版 (1280×720)。判定帯の赤にスマホ画面を添える。
+# いま使っているのはイラスト版 (thumb_illust.html)。これは差し替え前のもの。
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = r'C:\Users\takas\OneDrive\ドキュメント\GitHub\DisasterPrevention\公共交通オープンデータチャレンジ2026'
-OUT = ROOT + r'\素材\サムネイル.png'
+OUT = ROOT + r'\素材\サムネイル_画面版.png'
 FONT = r'C:\Windows\Fonts\YuGothB.ttc'
 W, H = 1280, 720
 RED = (0xa4, 0x23, 0x1c)
